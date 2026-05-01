@@ -6,16 +6,16 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   // 1. 全局忽略
-  { 
+  {
     ignores: [
-      '**/dist/**', 
-      '**/node_modules/**', 
+      '**/dist/**',
+      '**/node_modules/**',
       '**/build/**',
       '**/temp/**',
       'scripts/**',
-    ] 
+    ]
   },
-  
+
   // 2. 基础配置 (适用于所有 TS 文件)
   {
     files: ['**/*.{ts,tsx}'],

@@ -1,15 +1,15 @@
 services:
-  nowen-note:
+  nodejs-template:
     build:
       context: .
       dockerfile: Dockerfile
-    image: nowen-note:latest
-    container_name: nowen-note
+    image: nodejs-template:latest
+    container_name: nodejs-template
     restart: unless-stopped
     ports:
       - "3001:3001"
     volumes:
-      - nowen-note-data:/app/data
+      - nodejs-template-data:/app/data
     environment:
       - NODE_ENV=production
       - DB_PATH=/app/data/nowen-note.db
