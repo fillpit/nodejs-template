@@ -22,6 +22,7 @@ interface AppState {
   lastSyncedAt: string | null;
   mobileView: MobileView;
   mobileSidebarOpen: boolean;
+  user: User | null;
 }
 
 type Action =
@@ -41,7 +42,8 @@ type Action =
   | { type: "SET_SYNC_STATUS"; payload: SyncStatus }
   | { type: "SET_LAST_SYNCED"; payload: string }
   | { type: "SET_MOBILE_VIEW"; payload: MobileView }
-  | { type: "SET_MOBILE_SIDEBAR"; payload: boolean };
+  | { type: "SET_MOBILE_SIDEBAR"; payload: boolean }
+  | { type: "SET_USER"; payload: User | null };
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -90,6 +92,7 @@ const initialState: AppState = {
   lastSyncedAt: null,
   mobileView: "list",
   mobileSidebarOpen: false,
+  user: null,
 };
 
 export { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH, MIN_NOTELIST_WIDTH, MAX_NOTELIST_WIDTH, DEFAULT_NOTELIST_WIDTH };
@@ -141,6 +144,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, mobileView: action.payload };
     case "SET_MOBILE_SIDEBAR":
       return { ...state, mobileSidebarOpen: action.payload };
+    case "SET_USER":
+      return { ...state, user: action.payload };
     default:
       return state;
   }
@@ -187,6 +192,7 @@ export function useAppActions() {
     setLastSynced: useCallback((v: string) => dispatch({ type: "SET_LAST_SYNCED", payload: v }), [dispatch]),
     setMobileView: useCallback((v: MobileView) => dispatch({ type: "SET_MOBILE_VIEW", payload: v }), [dispatch]),
     setMobileSidebar: useCallback((v: boolean) => dispatch({ type: "SET_MOBILE_SIDEBAR", payload: v }), [dispatch]),
+    setUser: useCallback((v: User | null) => dispatch({ type: "SET_USER", payload: v }), [dispatch]),
     refreshNotebooks: useCallback(() => {
       api.getNotebooks().then((v) => dispatch({ type: "SET_NOTEBOOKS", payload: v })).catch(console.error);
     }, [dispatch]),

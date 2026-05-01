@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
+import AdminPanel from "@/components/AdminPanel";
 import AIChatPanel from "@/components/AIChatPanel";
 import LoginPage from "@/components/LoginPage";
 import { AppProvider, useApp, useAppActions, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH } from "@/store/AppContext";
@@ -113,9 +114,16 @@ function useSwipeGesture({
   }, [mobileSidebarOpen, onSwipeRight, onSwipeLeft]);
 }
 
-function AppLayout() {
+function AppLayout({ user }: { user: User }) {
   const { state } = useApp();
   const actions = useAppActions();
+
+  useEffect(() => {
+    if (user) {
+      actions.setUser(user);
+    }
+  }, [user, actions]);
+
   const isAIChatView = state.viewMode === "ai-chat";
 
   const handleBackToList = useCallback(() => {
@@ -189,7 +197,11 @@ function AppLayout() {
       ) : (
         <div className="flex-1 flex flex-col">
           <MobileTopBar />
-          <Dashboard />
+          {state.viewMode === "monitor" ? (
+            <AdminPanel />
+          ) : (
+            <Dashboard />
+          )}
         </div>
       )}
     </div>
@@ -301,7 +313,7 @@ function AuthGate() {
   return (
     <AppProvider>
       <TooltipProvider>
-        <AppLayout />
+        <AppLayout user={user!} />
       </TooltipProvider>
     </AppProvider>
   );
