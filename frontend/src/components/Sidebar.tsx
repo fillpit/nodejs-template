@@ -21,8 +21,8 @@ export default function Sidebar() {
   const user = state.user;
 
   const navItems: { icon: React.ReactNode; label: string; mode: ViewMode; active: boolean; badge?: string }[] = [
-    { icon: <LayoutDashboard size={16} />, label: t('sidebar.dashboard', "仪表盘"), mode: "dashboard" as ViewMode, active: state.viewMode === "dashboard" },
-    { icon: <Bot size={16} />, label: "AI 秘书", mode: "ai-chat" as ViewMode, active: state.viewMode === "ai-chat" },
+    { icon: <LayoutDashboard size={16} />, label: t('sidebar.dashboard', "仪表盘"), mode: "dashboard", active: state.viewMode === "dashboard" },
+    { icon: <Bot size={16} />, label: "AI 秘书", mode: "ai-chat", active: state.viewMode === "ai-chat" },
   ].filter(item => item.mode !== "system-tasks" || user?.username === 'admin');
 
   if (state.sidebarCollapsed) {
@@ -69,13 +69,13 @@ export default function Sidebar() {
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
               title={user?.username || t('sidebar.user_menu', "用户菜单")}
-              className="flex items-center justify-center w-full aspect-square rounded-lg border border-transparent hover:border-app-border hover:bg-app-hover transition-all overflow-hidden"
+              className="flex items-center justify-center w-full aspect-square rounded-xl border border-zinc-200/50 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20 transition-all shadow-md hover:shadow-lg overflow-hidden"
             >
               {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.username} className="w-7 h-7 rounded-full object-cover" />
+                <img src={user.avatarUrl} alt={user.username} className="w-11 h-11 rounded-2xl object-cover shadow-xl ring-2 ring-white dark:ring-zinc-800 transition-all duration-300 group-hover:scale-105 group-hover:ring-accent-primary/50" />
               ) : (
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-tx-tertiary hover:text-tx-primary transition-colors">
-                  <User size={18} />
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-accent-primary shadow-md group-hover:shadow-lg group-hover:border-accent-primary/30 transition-all">
+                  <User size={24} />
                 </div>
               )}
             </button>
@@ -207,13 +207,13 @@ export default function Sidebar() {
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             title={user?.username || t('sidebar.user_menu', "用户菜单")}
-            className="w-8 h-8 rounded-lg flex items-center justify-center border border-transparent hover:border-app-border hover:bg-app-hover transition-all overflow-hidden"
+            className="w-9 h-9 rounded-2xl flex items-center justify-center border border-zinc-200/50 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20 transition-all overflow-hidden shadow-md hover:shadow-lg"
           >
             {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.username} className="w-6 h-6 rounded-full object-cover" />
+              <img src={user.avatarUrl} alt={user.username} className="w-9 h-9 rounded-2xl object-cover shadow-lg ring-2 ring-white dark:ring-zinc-800 transition-all duration-300 group-hover:ring-accent-primary/50 group-hover:scale-105" />
             ) : (
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-tx-tertiary hover:text-tx-primary transition-colors">
-                <User size={15} />
+              <div className="w-9 h-9 rounded-2xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-accent-primary shadow-sm group-hover:shadow-md group-hover:border-accent-primary/30 transition-all">
+                <User size={18} />
               </div>
             )}
           </button>

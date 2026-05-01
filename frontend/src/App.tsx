@@ -190,14 +190,14 @@ function AppLayout({ user }: { user: User }) {
         <div className="flex-1 flex flex-col">
           <MobileTopBar />
           <AIChatPanel
-            onClose={() => actions.setViewMode("all")}
+            onClose={() => actions.setViewMode("dashboard")}
             onNavigateToNote={async () => {}}
           />
         </div>
       ) : (
         <div className="flex-1 flex flex-col">
           <MobileTopBar />
-          {state.viewMode === "monitor" ? (
+          {state.viewMode === "admin" ? (
             <AdminPanel />
           ) : (
             <Dashboard />

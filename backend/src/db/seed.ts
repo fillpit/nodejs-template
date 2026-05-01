@@ -21,6 +21,7 @@ export function seedDatabase() {
   if (settingsCount.count === 0) {
     const defaultSettings = [
       { key: "site_title", value: "nowen-note" },
+      { key: "registration_policy", value: "closed" },
       { key: "ai_provider", value: "openai" },
       { key: "ai_api_url", value: "https://api.openai.com/v1" },
       { key: "ai_model", value: "gpt-4o-mini" },

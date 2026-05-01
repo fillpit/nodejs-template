@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Bot, Loader2, Check, AlertCircle, RefreshCw, Eye, EyeOff, ChevronDown, Zap, CircleCheck } from "lucide-react";
+import { Bot, Loader2, Check, AlertCircle, RefreshCw, Eye, EyeOff, Zap, CircleCheck, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,12 @@ interface AISettingsState {
   ai_api_url: string;
   ai_api_key: string;
   ai_model: string;
+
+  ai_chat_provider: string;
+  ai_chat_api_url: string;
+  ai_chat_api_key: string;
+  ai_chat_model: string;
+
   ai_api_key_set: boolean;
 }
 
@@ -20,7 +26,7 @@ interface ProviderPreset {
   url: string;
   defaultModel: string;
   needsKey: boolean;
-  color: string; // gradient color
+  color: string;
 }
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -86,17 +92,290 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   },
 ];
 
+// --- Sub-components (Moved outside to prevent remounting/jitter) ---
+
+const ActionArea = ({
+  scenario,
+  isSaving,
+  isTesting,
+  testResults,
+  saveMsgs,
+  handleSave,
+  handleTest
+}: {
+  scenario: string;
+  isSaving: Record<string, boolean>;
+  isTesting: Record<string, boolean>;
+  testResults: Record<string, { success: boolean; message: string } | null>;
+  saveMsgs: Record<string, string>;
+  handleSave: (scenario: string) => void;
+  handleTest: (scenario: string) => void;
+}) => {
+  const loading = isSaving[scenario] || isTesting[scenario];
+  const result = testResults[scenario];
+  const msg = saveMsgs[scenario];
+
+  return (
+    <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleSave(scenario)}
+            disabled={loading}
+            type="button"
+            className="flex items-center justify-center gap-2 w-28 h-8 bg-accent-primary hover:bg-accent-primary/90 text-white rounded-lg text-[10px] font-bold transition-all disabled:opacity-40 shrink-0 relative overflow-hidden"
+          >
+            <div className="w-3 h-3 flex items-center justify-center shrink-0 relative">
+              <Loader2 size={12} className={cn("animate-spin absolute transition-all duration-300", isSaving[scenario] ? "opacity-100 scale-100" : "opacity-0 scale-50")} />
+              <Check size={12} className={cn("absolute transition-all duration-300", !isSaving[scenario] ? "opacity-100 scale-100" : "opacity-0 scale-50")} />
+            </div>
+            <span>保存配置</span>
+          </button>
+
+          <button
+            onClick={() => handleTest(scenario)}
+            disabled={loading}
+            type="button"
+            className="flex items-center justify-center gap-2 w-28 h-8 border border-zinc-200 dark:border-zinc-800 rounded-lg text-[10px] font-bold text-zinc-700 dark:text-zinc-300 hover:border-accent-primary/50 transition-all disabled:opacity-40 bg-white dark:bg-zinc-900 shadow-sm shrink-0 relative overflow-hidden"
+          >
+            <div className="w-3 h-3 flex items-center justify-center shrink-0 relative">
+              <Loader2 size={12} className={cn("animate-spin absolute transition-all duration-300", isTesting[scenario] ? "opacity-100 scale-100" : "opacity-0 scale-50")} />
+              <RefreshCw size={12} className={cn("absolute transition-all duration-300", !isTesting[scenario] ? "opacity-100 scale-100" : "opacity-0 scale-50")} />
+            </div>
+            <span>测试连接</span>
+          </button>
+        </div>
+
+        <div className="h-8 flex items-center gap-3 min-w-[200px] relative">
+          <span className={cn(
+            "text-[10px] font-bold transition-all duration-500 absolute",
+            msg ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 pointer-events-none",
+            msg?.includes("成功") ? "text-emerald-500" : "text-red-500"
+          )}>
+            {msg || "保存成功"}
+          </span>
+          <span className={cn(
+            "flex items-center gap-1 text-[10px] font-bold text-emerald-500 transition-all duration-500 absolute left-[80px]",
+            (result && result.success) ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 pointer-events-none"
+          )}>
+            <CircleCheck size={12} />
+            连接成功
+          </span>
+        </div>
+      </div>
+
+      <div className="h-[30px] flex items-center overflow-hidden">
+        <div className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all duration-500 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-500/20",
+          (result && !result.success) ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+        )}>
+          <AlertCircle size={12} />
+          <span className="truncate max-w-[400px]">{result?.message || "连接失败，请检查配置"}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScenarioConfig = ({
+  prefix,
+  title,
+  icon,
+  color,
+  settings,
+  setSettings,
+  editingScenarios,
+  setEditingScenarios,
+  getPreset,
+  children,
+  actionArea
+}: {
+  prefix: string;
+  title: string;
+  icon: React.ReactNode;
+  color: string;
+  settings: AISettingsState;
+  setSettings: React.Dispatch<React.SetStateAction<AISettingsState>>;
+  editingScenarios: Record<string, boolean>;
+  setEditingScenarios: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  getPreset: (id: string) => ProviderPreset | undefined;
+  children?: React.ReactNode;
+  actionArea: React.ReactNode;
+}) => {
+  const isEditing = !!editingScenarios[prefix];
+  const isCustom = !!(settings as any)[`ai_${prefix}_provider`];
+  const scenarioProvider = (settings as any)[`ai_${prefix}_provider`] || settings.ai_provider;
+  const scenarioPreset = getPreset(scenarioProvider);
+
+  return (
+    <div className={cn(
+      "space-y-4 p-5 rounded-2xl transition-[background-color,border-color,box-shadow,ring] duration-300 shadow-sm border",
+      isEditing
+        ? "bg-white dark:bg-zinc-900 border-accent-primary/30 ring-4 ring-accent-primary/5"
+        : "bg-zinc-50 dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800"
+    )}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2.5">
+          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br text-white shadow-sm", color)}>
+            {icon}
+          </div>
+          <div>
+            <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100">{title}</div>
+            {!isEditing && (
+              <div className="text-[10px] text-zinc-500 font-medium">
+                {isCustom ? `自定义: ${scenarioPreset?.name || "未知"}` : "继承全局配置"}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <button
+              onClick={() => setEditingScenarios(prev => ({ ...prev, [prefix]: false }))}
+              className="px-3 py-1 rounded-full text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+            >
+              取消
+            </button>
+          ) : (
+            <button
+              onClick={() => setEditingScenarios(prev => ({ ...prev, [prefix]: true }))}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white transition-all"
+            >
+              <Settings size={10} />
+              设置
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isEditing ? (
+        <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800">
+            <span className="text-[11px] font-bold text-zinc-500">启用独立服务商配置</span>
+            <button
+              onClick={() => {
+                const isNowCustom = !isCustom;
+                setSettings(prev => ({
+                  ...prev,
+                  [`ai_${prefix}_provider`]: isNowCustom ? settings.ai_provider : "",
+                  [`ai_${prefix}_api_url`]: isNowCustom ? settings.ai_api_url : "",
+                  [`ai_${prefix}_model`]: isNowCustom ? settings.ai_model : "",
+                }));
+              }}
+              className={cn(
+                "relative inline-flex h-5 w-9 items-center rounded-full transition-colors outline-none",
+                isCustom ? "bg-accent-primary" : "bg-zinc-300 dark:bg-zinc-600"
+              )}
+            >
+              <span className={cn(
+                "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
+                isCustom ? "translate-x-5" : "translate-x-1"
+              )} />
+            </button>
+          </div>
+
+          {isCustom && (
+            <div className="space-y-4 pt-1">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {PROVIDER_PRESETS.map(p => {
+                  const isSel = (settings as any)[`ai_${prefix}_provider`] === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setSettings(prev => ({
+                        ...prev,
+                        [`ai_${prefix}_provider`]: p.id,
+                        [`ai_${prefix}_api_url`]: p.url,
+                        [`ai_${prefix}_model`]: p.defaultModel
+                      }))}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all text-left group relative overflow-hidden",
+                        isSel
+                          ? "border-accent-primary bg-accent-primary/5"
+                          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      )}
+                    >
+                      <div className={cn("w-5 h-5 rounded flex items-center justify-center bg-gradient-to-br text-[8px] text-white transition-transform group-hover:scale-110", p.color)}>
+                        <Zap size={10} />
+                      </div>
+                      <span className="text-[10px] font-bold truncate">{p.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor={`ai-${prefix}-api-url`} className="text-[10px] font-bold text-zinc-500 uppercase">API 端点</label>
+                  <input
+                    id={`ai-${prefix}-api-url`}
+                    name={`ai_${prefix}_api_url`}
+                    type="text"
+                    value={(settings as any)[`ai_${prefix}_api_url`]}
+                    onChange={(e) => setSettings(prev => ({ ...prev, [`ai_${prefix}_api_url`]: e.target.value }))}
+                    className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor={`ai-${prefix}-api-key`} className="text-[10px] font-bold text-zinc-500 uppercase">API Key</label>
+                  <input
+                    id={`ai-${prefix}-api-key`}
+                    name={`ai_${prefix}_api_key`}
+                    type="password"
+                    value={(settings as any)[`ai_${prefix}_api_key`]}
+                    onChange={(e) => setSettings(prev => ({ ...prev, [`ai_${prefix}_api_key`]: e.target.value }))}
+                    placeholder="留空则不更新"
+                    className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor={`ai-${prefix}-model`} className="text-[10px] font-bold text-zinc-500 uppercase">选用模型</label>
+                <input
+                  id={`ai-${prefix}-model`}
+                  name={`ai_${prefix}_model`}
+                  type="text"
+                  value={(settings as any)[`ai_${prefix}_model`]}
+                  onChange={(e) => setSettings(prev => ({ ...prev, [`ai_${prefix}_model`]: e.target.value }))}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {children}
+          {actionArea}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 pt-1">
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">模型</div>
+            <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+              {(settings as any)[`ai_${prefix}_model`] || settings.ai_model || "未设置"}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AISettingsPanel() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<AISettingsState>({
-    ai_provider: "openai", ai_api_url: "", ai_api_key: "", ai_model: "", ai_api_key_set: false,
+    ai_provider: "openai", ai_api_url: "", ai_api_key: "", ai_model: "",
+    ai_chat_provider: "", ai_chat_api_url: "", ai_chat_api_key: "", ai_chat_model: "",
+    ai_api_key_set: false,
   });
   const [localKey, setLocalKey] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [saveMsg, setSaveMsg] = useState("");
+  const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
+  const [isTesting, setIsTesting] = useState<Record<string, boolean>>({});
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string } | null>>({});
+  const [saveMsgs, setSaveMsgs] = useState<Record<string, string>>({});
+  const [editingScenarios, setEditingScenarios] = useState<Record<string, boolean>>({});
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
@@ -104,7 +383,7 @@ export default function AISettingsPanel() {
 
   const loadSettings = useCallback(async () => {
     try {
-      const data = await api.getAISettings();
+      const data = await api.getAISettings() as AISettingsState;
       setSettings(data);
       setLocalKey(data.ai_api_key_set ? data.ai_api_key : "");
       setIsConfigured(!!data.ai_api_url && (data.ai_api_key_set || !getPreset(data.ai_provider)?.needsKey));
@@ -127,50 +406,57 @@ export default function AISettingsPanel() {
       ai_model: preset.defaultModel,
     }));
     if (!preset.needsKey) setLocalKey("");
-    setTestResult(null);
+    setTestResults(prev => ({ ...prev, global: null }));
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setSaveMsg("");
+  const handleSave = async (scenario: string) => {
+    setIsSaving(prev => ({ ...prev, [scenario]: true }));
+    setSaveMsgs(prev => ({ ...prev, [scenario]: "" }));
+    setTestResults(prev => ({ ...prev, [scenario]: null }));
     try {
-      const payload: any = {
-        ai_provider: settings.ai_provider,
-        ai_api_url: settings.ai_api_url,
-        ai_model: settings.ai_model,
-      };
-      if (localKey && !localKey.includes("****")) {
+      const payload: any = {};
+      if (scenario === "global") {
+        payload.ai_provider = settings.ai_provider;
+        payload.ai_api_url = settings.ai_api_url;
         payload.ai_api_key = localKey;
+        payload.ai_model = settings.ai_model;
+      } else if (scenario === "chat") {
+        payload.ai_chat_provider = settings.ai_chat_provider;
+        payload.ai_chat_api_url = settings.ai_chat_api_url;
+        payload.ai_chat_api_key = settings.ai_chat_api_key;
+        payload.ai_chat_model = settings.ai_chat_model;
       }
-      const data = await api.updateAISettings(payload);
+
+      for (const k in payload) {
+        if (k.includes("api_key") && payload[k]?.includes("****")) {
+          delete payload[k];
+        }
+      }
+
+      const data = await api.updateAISettings(payload) as AISettingsState;
       setSettings(data);
-      setIsConfigured(true);
-      setSaveMsg(t("ai.saveSuccess"));
-      setTimeout(() => setSaveMsg(""), 2000);
+      if (scenario === "global") setIsConfigured(true);
+      setSaveMsgs(prev => ({ ...prev, [scenario]: t("ai.saveSuccess") }));
+      setTimeout(() => setSaveMsgs(prev => ({ ...prev, [scenario]: "" })), 2000);
     } catch (err: any) {
-      setSaveMsg(err.message || t("ai.saveFailed"));
+      setSaveMsgs(prev => ({ ...prev, [scenario]: err.message || t("ai.saveFailed") }));
     } finally {
-      setIsSaving(false);
+      setIsSaving(prev => ({ ...prev, [scenario]: false }));
     }
   };
 
-  const handleTest = async () => {
-    setIsTesting(true);
-    setTestResult(null);
+  const handleTest = async (scenario: string) => {
+    const sId = scenario === "global" ? "" : scenario;
+    setIsTesting(prev => ({ ...prev, [scenario]: true }));
+    setTestResults(prev => ({ ...prev, [scenario]: null }));
     try {
-      const payload: any = {
-        ai_provider: settings.ai_provider,
-        ai_api_url: settings.ai_api_url,
-        ai_model: settings.ai_model,
-      };
-      if (localKey && !localKey.includes("****")) payload.ai_api_key = localKey;
-      await api.updateAISettings(payload);
-      const result = await api.testAIConnection();
-      setTestResult({ success: result.success, message: result.message || result.error || "" });
+      await handleSave(scenario);
+      const result = await api.testAIConnection({ scenario: sId });
+      setTestResults(prev => ({ ...prev, [scenario]: { success: result.success, message: result.message || result.error || "" } }));
     } catch (err: any) {
-      setTestResult({ success: false, message: err.message || t("ai.testFailed") });
+      setTestResults(prev => ({ ...prev, [scenario]: { success: false, message: err.message || t("ai.testFailed") } }));
     } finally {
-      setIsTesting(false);
+      setIsTesting(prev => ({ ...prev, [scenario]: false }));
     }
   };
 
@@ -194,6 +480,15 @@ export default function AISettingsPanel() {
   const currentPreset = getPreset(settings.ai_provider);
   const needsKey = currentPreset?.needsKey ?? true;
 
+  const commonActionAreaProps = {
+    isSaving,
+    isTesting,
+    testResults,
+    saveMsgs,
+    handleSave,
+    handleTest
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -203,190 +498,182 @@ export default function AISettingsPanel() {
           <p className="text-sm text-zinc-500 dark:text-zinc-400">{t("ai.description")}</p>
         </div>
         {isConfigured && (
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase">
             <CircleCheck size={14} />
             {t("ai.configured")}
           </span>
         )}
       </div>
 
-      {/* Provider 卡片列表 */}
-      <div className="space-y-2">
-        <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("ai.provider")}</label>
-        <div className="space-y-2">
-          {PROVIDER_PRESETS.map(p => {
-            const isSelected = settings.ai_provider === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => handleProviderChange(p.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left group",
-                  isSelected
-                    ? "border-accent-primary bg-accent-primary/5 dark:bg-accent-primary/10"
-                    : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
-                )}
-              >
-                {/* Provider icon */}
-                <div className={cn(
-                  "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-gradient-to-br text-white",
-                  p.color
-                )}>
-                  <Zap size={16} />
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-sm font-semibold",
-                      isSelected ? "text-accent-primary" : "text-zinc-800 dark:text-zinc-200"
-                    )}>
-                      {p.name}
-                    </span>
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{t(p.desc)}</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">
-                    {p.models}
-                  </p>
-                </div>
-
-                {/* 选中标记 */}
-                {isSelected && (
-                  <CircleCheck size={18} className="text-accent-primary shrink-0" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 配置区域 */}
-      <div className="space-y-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/30 border border-zinc-200 dark:border-zinc-800">
-        <div className="flex items-center gap-2 mb-1">
-          <div className={cn("w-6 h-6 rounded-md flex items-center justify-center bg-gradient-to-br text-white", currentPreset?.color || "from-zinc-500 to-zinc-600")}>
-            <Zap size={12} />
-          </div>
-          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-            {currentPreset?.name || settings.ai_provider}
-          </span>
-          <span className="text-[10px] text-zinc-400">{t("ai.configLabel")}</span>
-        </div>
-
-        {/* API URL */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("ai.apiUrl")}</label>
-          <input
-            type="text"
-            value={settings.ai_api_url}
-            onChange={(e) => setSettings(prev => ({ ...prev, ai_api_url: e.target.value }))}
-            placeholder={currentPreset?.url || "https://api.openai.com/v1"}
-            className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-accent-primary/40 focus:border-accent-primary outline-none transition-all placeholder:text-zinc-400"
-          />
-        </div>
-
-        {/* API Key */}
-        {needsKey && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("ai.apiKey")}</label>
-            <div className="relative">
-              <input
-                type={showKey ? "text" : "password"}
-                value={localKey}
-                onChange={(e) => { setLocalKey(e.target.value); setTestResult(null); }}
-                placeholder={settings.ai_api_key_set ? t("ai.apiKeySet") : "sk-..."}
-                className="w-full px-3 py-2 pr-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-accent-primary/40 focus:border-accent-primary outline-none transition-all placeholder:text-zinc-400"
-              />
-              <button
-                onClick={() => setShowKey(!showKey)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-              >
-                {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
+      {/* 全局默认配置卡片 */}
+      <div className={cn(
+        "space-y-4 p-5 rounded-2xl transition-[background-color,border-color,box-shadow,ring] duration-300 shadow-sm border",
+        editingScenarios.global
+          ? "bg-white dark:bg-zinc-900 border-accent-primary/30 ring-4 ring-accent-primary/5"
+          : "bg-zinc-50 dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800"
+      )}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2.5">
+            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br text-white shadow-sm from-blue-600 to-indigo-700")}>
+              <Bot size={18} />
             </div>
-          </div>
-        )}
-
-        {/* Model */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("ai.model")}</label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={settings.ai_model}
-                onChange={(e) => setSettings(prev => ({ ...prev, ai_model: e.target.value }))}
-                placeholder={currentPreset?.defaultModel || "gpt-4o-mini"}
-                className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-accent-primary/40 focus:border-accent-primary outline-none transition-all placeholder:text-zinc-400"
-              />
-              {modelDropdownOpen && models.length > 0 && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setModelDropdownOpen(false)} />
-                  <div className="absolute z-50 top-full left-0 mt-1 w-full max-h-48 overflow-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl">
-                    {models.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => { setSettings(prev => ({ ...prev, ai_model: m.id })); setModelDropdownOpen(false); }}
-                        className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
-                      >
-                        {m.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
+            <div>
+              <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100">全局默认配置</div>
+              {!editingScenarios.global && (
+                <div className="text-[10px] text-zinc-500 font-medium">服务商: {currentPreset?.name || "自定义"}</div>
               )}
             </div>
-            <button
-              onClick={fetchModels}
-              disabled={loadingModels || !settings.ai_api_url}
-              className="flex items-center gap-1.5 px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-400 hover:border-accent-primary/50 hover:text-accent-primary transition-colors disabled:opacity-40 bg-white dark:bg-zinc-900"
-            >
-              {loadingModels ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-              {t("ai.fetchModels")}
-            </button>
           </div>
+          <button
+            onClick={() => setEditingScenarios(prev => ({ ...prev, global: !prev.global }))}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition-all",
+              editingScenarios.global
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-600"
+                : "bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white"
+            )}
+          >
+            {editingScenarios.global ? "取消" : (
+              <>
+                <Settings size={10} />
+                设置
+              </>
+            )}
+          </button>
         </div>
-      </div>
 
-      {/* 操作按钮 */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-accent-primary hover:bg-accent-primary/90 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-40"
-        >
-          {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-          {t("ai.saveSettings")}
-        </button>
+        {editingScenarios.global ? (
+          <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {PROVIDER_PRESETS.map(p => {
+                const isSel = settings.ai_provider === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => handleProviderChange(p.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all text-left group relative overflow-hidden",
+                      isSel
+                        ? "border-accent-primary bg-accent-primary/5"
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    )}
+                  >
+                    <div className={cn("w-5 h-5 rounded flex items-center justify-center bg-gradient-to-br text-[8px] text-white transition-transform group-hover:scale-110", p.color)}>
+                      <Zap size={10} />
+                    </div>
+                    <span className="text-[10px] font-bold truncate">{p.name}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-        <button
-          onClick={handleTest}
-          disabled={isTesting || !settings.ai_api_url}
-          className="flex items-center gap-1.5 px-4 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:border-accent-primary/50 transition-all disabled:opacity-40"
-        >
-          {isTesting ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
-          {t("ai.testConnection")}
-        </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="ai-global-api-url" className="text-[10px] font-bold text-zinc-500 uppercase">{t("ai.apiUrl")}</label>
+                <input
+                  id="ai-global-api-url"
+                  name="ai_api_url"
+                  type="text"
+                  value={settings.ai_api_url}
+                  onChange={(e) => setSettings(prev => ({ ...prev, ai_api_url: e.target.value }))}
+                  placeholder={currentPreset?.url || "https://api.openai.com/v1"}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
+                />
+              </div>
+              {needsKey && (
+                <div className="space-y-1">
+                  <label htmlFor="ai-global-api-key" className="text-[10px] font-bold text-zinc-500 uppercase">{t("ai.apiKey")}</label>
+                  <div className="relative">
+                    <input
+                      id="ai-global-api-key"
+                      name="ai_api_key"
+                      type={showKey ? "text" : "password"}
+                      value={localKey}
+                      onChange={(e) => setLocalKey(e.target.value)}
+                      placeholder={settings.ai_api_key_set ? t("ai.apiKeySet") : "sk-..."}
+                      className="w-full px-3 py-1.5 pr-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                    >
+                      {showKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
-        {saveMsg && (
-          <span className={cn("text-xs", saveMsg === t("ai.saveSuccess") ? "text-emerald-500" : "text-red-500")}>
-            {saveMsg}
-          </span>
+            <div className="space-y-1">
+              <label htmlFor="ai-global-model" className="text-[10px] font-bold text-zinc-500 uppercase">{t("ai.model")}</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    id="ai-global-model"
+                    name="ai_model"
+                    type="text"
+                    value={settings.ai_model}
+                    onChange={(e) => setSettings(prev => ({ ...prev, ai_model: e.target.value }))}
+                    className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
+                  />
+                  {modelDropdownOpen && models.length > 0 && (
+                    <div className="absolute z-50 top-full left-0 mt-1 w-full max-h-48 overflow-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl">
+                      {models.map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => { setSettings(prev => ({ ...prev, ai_model: m.id })); setModelDropdownOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-[11px] hover:bg-accent-primary/5 transition-colors"
+                        >
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchModels}
+                  disabled={loadingModels || !settings.ai_api_url}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-lg text-[10px] font-bold text-zinc-600 hover:text-accent-primary transition-all disabled:opacity-40"
+                >
+                  {loadingModels ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                </button>
+              </div>
+            </div>
+            <ActionArea scenario="global" {...commonActionAreaProps} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-1">
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">端点</div>
+              <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400 truncate">{settings.ai_api_url || "未设置"}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">默认模型</div>
+              <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{settings.ai_model || "未设置"}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">API Key</div>
+              <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{settings.ai_api_key_set ? "********" : "未配置"}</div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* 测试结果 */}
-      {testResult && (
-        <div className={cn(
-          "flex items-center gap-2 p-3 rounded-lg text-sm",
-          testResult.success
-            ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-            : "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400"
-        )}>
-          {testResult.success ? <Check size={16} /> : <AlertCircle size={16} />}
-          {testResult.message}
-        </div>
-      )}
+      <ScenarioConfig
+        prefix="chat"
+        title="侧边栏助手"
+        icon={<Bot size={16} />}
+        color="from-sky-500 to-blue-600"
+        settings={settings}
+        setSettings={setSettings}
+        editingScenarios={editingScenarios}
+        setEditingScenarios={setEditingScenarios}
+        getPreset={getPreset}
+        actionArea={<ActionArea scenario="chat" {...commonActionAreaProps} />}
+      />
     </div>
   );
 }

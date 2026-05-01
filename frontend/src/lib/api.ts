@@ -50,14 +50,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Public (no auth required)
-  getSiteSettingsPublic: async (): Promise<{ site_title: string; site_favicon: string; editor_font_family: string }> => {
+  getSiteSettingsPublic: async (): Promise<{ site_title: string; site_favicon: string; editor_font_family: string; registration_policy: "open" | "invite" | "closed" }> => {
     const res = await fetch(`${getBaseUrl()}/settings`);
-    if (!res.ok) return { site_title: "nowen-note", site_favicon: "", editor_font_family: "" };
+    if (!res.ok) return { site_title: "nowen-note", site_favicon: "", editor_font_family: "", registration_policy: "closed" };
     return res.json();
   },
 
   // User
   getMe: () => request<User>("/me"),
+  updateMe: (data: { avatarUrl?: string; email?: string }) => request<User>("/me", { method: "PUT", body: JSON.stringify(data) }),
 
   // Notebooks
   getNotebooks: () => request<Notebook[]>("/notebooks"),
@@ -101,10 +102,18 @@ export const api = {
   toggleTask: (id: string) => request<Task>(`/tasks/${id}/toggle`, { method: "PATCH" }),
   deleteTask: (id: string) => request(`/tasks/${id}`, { method: "DELETE" }),
   getTaskStats: () => request<TaskStats>("/tasks/stats/summary"),
+  
+  // Users
+  getUsers: () => request<User[]>("/users"),
+  createUser: (data: { username: string; password?: string; email?: string }) =>
+    request<User>("/users", { method: "POST", body: JSON.stringify(data) }),
+  deleteUser: (id: string) => request(`/users/${id}`, { method: "DELETE" }),
 
   // Security
   updateSecurity: (data: { currentPassword: string; newUsername?: string; newPassword?: string }) =>
     request<{ success: boolean; message: string }>("/auth/change-password", { method: "POST", body: JSON.stringify(data) }),
+  register: (data: { username: string; password?: string; email?: string }) =>
+    request<{ token: string; user: User }>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
   factoryReset: (confirmText: string) =>
     request<{ success: boolean; message: string }>("/auth/factory-reset", { method: "POST", body: JSON.stringify({ confirmText }) }),
 
@@ -117,9 +126,9 @@ export const api = {
     }),
 
   // Site Settings
-  getSiteSettings: () => request<{ site_title: string; site_favicon: string; editor_font_family: string }>("/settings"),
-  updateSiteSettings: (data: { site_title?: string; site_favicon?: string; editor_font_family?: string }) =>
-    request<{ site_title: string; site_favicon: string; editor_font_family: string }>("/settings", {
+  getSiteSettings: () => request<{ site_title: string; site_favicon: string; editor_font_family: string; registration_policy: "open" | "invite" | "closed" }>("/settings"),
+  updateSiteSettings: (data: { site_title?: string; site_favicon?: string; editor_font_family?: string; registration_policy?: string }) =>
+    request<{ site_title: string; site_favicon: string; editor_font_family: string; registration_policy: string }>("/settings", {
       method: "PUT",
       body: JSON.stringify(data),
     }),

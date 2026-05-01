@@ -7,18 +7,20 @@ export interface SiteSettings {
   site_title: string;
   site_favicon: string;
   editor_font_family: string;
+  registration_policy: "open" | "invite" | "closed";
 }
 
 const DEFAULTS: SiteSettings = {
   site_title: "nowen-note",
   site_favicon: "",
   editor_font_family: "",
+  registration_policy: "closed",
 };
 
 // 获取所有站点设置
 settings.get("/", (c) => {
   const db = getDb();
-  const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%'").all() as { key: string; value: string }[];
+  const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%' OR key = 'registration_policy'").all() as { key: string; value: string }[];
   const result: Record<string, string> = { ...DEFAULTS };
   for (const row of rows) {
     result[row.key] = row.value;
@@ -47,11 +49,14 @@ settings.put("/", async (c) => {
     if (body.editor_font_family !== undefined) {
       upsert.run("editor_font_family", body.editor_font_family);
     }
+    if (body.registration_policy !== undefined) {
+      upsert.run("registration_policy", body.registration_policy);
+    }
   });
   tx();
 
   // 返回更新后的全部设置
-  const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%'").all() as { key: string; value: string }[];
+  const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%' OR key = 'registration_policy'").all() as { key: string; value: string }[];
   const result: Record<string, string> = { ...DEFAULTS };
   for (const row of rows) {
     result[row.key] = row.value;

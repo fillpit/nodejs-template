@@ -5,13 +5,15 @@ import { api } from "@/lib/api";
 export interface SiteConfig {
   title: string;
   favicon: string;
-  editorFontFamily: string; // 空串=默认(Inter), 自定义字体 id, 或内置字体名
+  editorFontFamily: string;
+  registrationPolicy: "open" | "invite" | "closed";
 }
 
 const DEFAULT_CONFIG: SiteConfig = {
   title: "nowen-note",
   favicon: "",
   editorFontFamily: "",
+  registrationPolicy: "closed",
 };
 
 // 内置字体选项（不需要上传）
@@ -106,6 +108,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
         title: data.site_title || "nowen-note",
         favicon: data.site_favicon || "",
         editorFontFamily: data.editor_font_family || "",
+        registrationPolicy: data.registration_policy || "closed",
       };
       setSiteConfig(config);
       applyToDOM(config.title, config.favicon);
@@ -140,10 +143,11 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
       title: data.site_title || "nowen-note",
       favicon: data.site_favicon || "",
       editorFontFamily: data.editor_font_family || siteConfig.editorFontFamily,
+      registrationPolicy: siteConfig.registrationPolicy,
     };
     setSiteConfig(config);
     applyToDOM(config.title, config.favicon);
-  }, [siteConfig.editorFontFamily]);
+  }, [siteConfig]);
 
   const updateEditorFont = useCallback(async (fontId: string) => {
     const data = await api.updateSiteSettings({ editor_font_family: fontId });

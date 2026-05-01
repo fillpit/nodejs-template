@@ -43,8 +43,13 @@ app.get("/api/openapi.json", (c) => c.json(generateOpenAPISpec()));
 // 站点设置（GET 无需 JWT，允许未登录时加载品牌信息）
 app.get("/api/settings", (c) => {
   const db = getDb();
-  const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%'").all() as { key: string; value: string }[];
-  const result: Record<string, string> = { site_title: "nowen-note", site_favicon: "", editor_font_family: "" };
+  const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%' OR key = 'registration_policy'").all() as { key: string; value: string }[];
+  const result: Record<string, string> = { 
+    site_title: "nowen-note", 
+    site_favicon: "", 
+    editor_font_family: "",
+    registration_policy: "closed"
+  };
   for (const row of rows) {
     result[row.key] = row.value;
   }
@@ -103,6 +108,7 @@ app.use("/api/*", async (c, next) => {
 
 import settingsRouter from "./routes/settings";
 import fontsRouter from "./routes/fonts";
+import usersRouter from "./routes/users";
 
 // API 路由（受 JWT 保护）
 app.route("/api/ai", aiRouter);
@@ -112,6 +118,7 @@ app.route("/api/backups", backupsRouter);
 
 app.route("/api/settings", settingsRouter);
 app.route("/api/fonts", fontsRouter);
+app.route("/api/users", usersRouter);
 
 // 获取当前登录用户信息
 app.get("/api/me", (c) => {
@@ -119,6 +126,42 @@ app.get("/api/me", (c) => {
   const userId = c.req.header("X-User-Id");
   const user = db.prepare("SELECT id, username, email, avatarUrl, createdAt FROM users WHERE id = ?").get(userId);
   return c.json(user);
+});
+
+// 更新当前用户信息
+app.put("/api/me", async (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id");
+  const body = await c.req.json();
+  const { avatarUrl, email } = body as { avatarUrl?: string; email?: string };
+
+  const updates: string[] = [];
+  const params: any[] = [];
+
+  if (avatarUrl !== undefined) {
+    updates.push("avatarUrl = ?");
+    params.push(avatarUrl);
+  }
+
+  if (email !== undefined) {
+    updates.push("email = ?");
+    params.push(email);
+  }
+
+  if (updates.length === 0) {
+    return c.json({ error: "没有要更新的内容" }, 400);
+  }
+
+  updates.push("updatedAt = datetime('now')");
+  params.push(userId);
+
+  try {
+    db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+    const updatedUser = db.prepare("SELECT id, username, email, avatarUrl, createdAt FROM users WHERE id = ?").get(userId);
+    return c.json(updatedUser);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
 });
 
 const port = Number(process.env.PORT) || 3001;

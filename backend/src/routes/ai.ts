@@ -11,6 +11,12 @@ export interface AISettings {
   ai_api_url: string;        // API 端点
   ai_api_key: string;        // API Key（Ollama 可为空）
   ai_model: string;          // 模型名称
+
+  // 侧边栏助手独立配置
+  ai_chat_provider?: string;
+  ai_chat_api_url?: string;
+  ai_chat_api_key?: string;
+  ai_chat_model?: string;
 }
 
 const AI_DEFAULTS: AISettings = {
@@ -44,16 +50,22 @@ function getAISettings(): AISettings {
 ai.get("/settings", (c) => {
   const settings = getAISettings();
   // 不返回完整 API Key，只返回掩码
-  return c.json({
+  const response: any = {
     ...settings,
     ai_api_key: settings.ai_api_key ? "sk-****" + settings.ai_api_key.slice(-4) : "",
     ai_api_key_set: !!settings.ai_api_key,
-  });
+  };
+
+  if (settings.ai_chat_api_key) {
+    response.ai_chat_api_key = "sk-****" + settings.ai_chat_api_key.slice(-4);
+  }
+
+  return c.json(response);
 });
 
 // PUT /api/ai/settings
 ai.put("/settings", async (c) => {
-  const body = await c.req.json() as Partial<AISettings>;
+  const body = await c.req.json() as Record<string, string>;
   const db = getDb();
 
   const upsert = db.prepare(`
@@ -62,18 +74,23 @@ ai.put("/settings", async (c) => {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = datetime('now')
   `);
 
+  const allowedKeys = [
+    "ai_provider", "ai_api_url", "ai_api_key", "ai_model",
+    "ai_chat_provider", "ai_chat_api_url", "ai_chat_api_key", "ai_chat_model"
+  ];
+
   const tx = db.transaction(() => {
-    if (body.ai_provider !== undefined) {
-      upsert.run("ai_provider", body.ai_provider);
-    }
-    if (body.ai_api_url !== undefined) {
-      upsert.run("ai_api_url", body.ai_api_url.replace(/\/+$/, ""));
-    }
-    if (body.ai_api_key !== undefined && !body.ai_api_key.includes("****")) {
-      upsert.run("ai_api_key", body.ai_api_key);
-    }
-    if (body.ai_model !== undefined) {
-      upsert.run("ai_model", body.ai_model);
+    for (const key of allowedKeys) {
+      if (body[key] !== undefined) {
+        let value = body[key];
+        if (key.includes("api_key") && value.includes("****")) {
+          continue; // Skip masked keys
+        }
+        if (key.includes("api_url")) {
+          value = value.replace(/\/+$/, "");
+        }
+        upsert.run(key, value);
+      }
     }
   });
   tx();
@@ -245,16 +262,23 @@ ai.post("/chat", async (c) => {
   messages.push({ role: "user", content: `${systemPrompt}\n\n${text}` });
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (settings.ai_api_key) {
-    headers["Authorization"] = `Bearer ${settings.ai_api_key}`;
+  
+  // 使用场景特定配置（如果有），否则使用全局配置
+  const provider = settings.ai_chat_provider || settings.ai_provider;
+  const apiUrl = (settings.ai_chat_api_url || settings.ai_api_url).replace(/\/+$/, "");
+  const apiKey = settings.ai_chat_api_key || settings.ai_api_key;
+  const model = settings.ai_chat_model || settings.ai_model;
+
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
   }
 
   try {
-    const res = await fetch(`${settings.ai_api_url}/chat/completions`, {
+    const res = await fetch(`${apiUrl}/chat/completions`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: settings.ai_model,
+        model: model,
         messages,
         stream: true,
         temperature: action === "fix_grammar" ? 0.1 : action === "format_code" ? 0.2 : 0.7,
@@ -310,7 +334,140 @@ ai.post("/chat", async (c) => {
     return c.json({ error: err.message || "AI 请求失败" }, 500);
   }
 });
+// ===== 知识库问答（流式 SSE） =====
+ai.post("/ask", async (c) => {
+  const settings = getAISettings();
+  const { question, history } = await c.req.json() as {
+    question: string;
+    history?: { role: string; content: string }[];
+  };
 
+  if (!question) {
+    return c.json({ error: "问题不能为空" }, 400);
+  }
 
+  const provider = settings.ai_chat_provider || settings.ai_provider;
+  const apiUrl = (settings.ai_chat_api_url || settings.ai_api_url).replace(/\/+$/, "");
+  const apiKey = settings.ai_chat_api_key || settings.ai_api_key;
+  const model = settings.ai_chat_model || settings.ai_model;
+
+  const messages: { role: string; content: string }[] = [
+    { role: "system", content: "你是一个智能笔记助手。请基于用户的提问提供有帮助的回答。如果涉及知识库搜索，请说明结果。直接输出回答内容。" },
+  ];
+
+  if (history && history.length > 0) {
+    messages.push(...history.slice(-10));
+  }
+
+  messages.push({ role: "user", content: question });
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  try {
+    const res = await fetch(`${apiUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return c.json({ error: `AI 服务错误: ${res.status} ${err.slice(0, 200)}` }, 502);
+    }
+
+    return streamSSE(c, async (stream) => {
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        // 先发送一个空的参考引用（因为后端目前没有真正的 FTS 索引）
+        // await stream.writeSSE({ data: JSON.stringify([]), event: "message" });
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data: ")) continue;
+            const data = trimmed.slice(6);
+            if (data === "[DONE]") {
+              await stream.writeSSE({ data: "[DONE]", event: "done" });
+              return;
+            }
+            try {
+              const json = JSON.parse(data);
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) {
+                await stream.writeSSE({ data: content, event: "message" });
+              }
+            } catch { /* skip */ }
+          }
+        }
+        await stream.writeSSE({ data: "[DONE]", event: "done" });
+      } catch (err) {
+        await stream.writeSSE({ data: "流式传输中断", event: "error" });
+      }
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "AI 请求失败" }, 500);
+  }
+});
+
+// ===== 知识库统计 =====
+ai.get("/knowledge-stats", (c) => {
+  const db = getDb();
+  // 由于目前是模板项目，核心业务表（notes, notebooks 等）可能不存在
+  // 我们通过 try-catch 来安全地获取统计，如果表不存在则返回 0
+  let stats = {
+    noteCount: 0,
+    ftsCount: 0,
+    notebookCount: 0,
+    tagCount: 0,
+    recentTopics: [],
+    indexed: false,
+  };
+
+  try {
+    const noteCount = db.prepare("SELECT COUNT(*) as count FROM notes WHERE isTrashed = 0").get() as any;
+    stats.noteCount = noteCount?.count || 0;
+    
+    const notebookCount = db.prepare("SELECT COUNT(*) as count FROM notebooks").get() as any;
+    stats.notebookCount = notebookCount?.count || 0;
+
+    const tagCount = db.prepare("SELECT COUNT(*) as count FROM tags").get() as any;
+    stats.tagCount = tagCount?.count || 0;
+  } catch {
+    // 表不存在，保持为 0
+  }
+
+  return c.json(stats);
+});
+
+// ===== 更多 AI 功能桩位 (Stubs) =====
+ai.post("/parse-document", async (c) => {
+  return c.json({ error: "文档解析功能在此模板中尚未实现" }, 501);
+});
+
+ai.post("/import-to-knowledge", async (c) => {
+  return c.json({ error: "知识库导入功能在此模板中尚未实现" }, 501);
+});
+
+ai.post("/batch-format", async (c) => {
+  return c.json({ error: "批量格式化功能在此模板中尚未实现" }, 501);
+});
 
 export default ai;

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AISettingsPanel from "./AISettingsPanel";
+import SiteSettingsPanel from "./SiteSettingsPanel";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -57,7 +58,7 @@ export default function AdminPanel() {
         <div className="w-full md:w-64 shrink-0 space-y-8">
           <div className="px-4 flex items-center gap-4 mb-8">
             <button
-              onClick={() => actions.setViewMode("all")}
+              onClick={() => actions.setViewMode("dashboard")}
               className="w-10 h-10 rounded-2xl bg-app-surface border border-app-border flex items-center justify-center text-tx-secondary hover:text-tx-primary hover:border-tx-tertiary transition-all shadow-sm"
               title="返回"
             >
@@ -128,12 +129,15 @@ export default function AdminPanel() {
 
               {activeTab === "users" && <UserManagementView />}
 
+              {activeTab === "site" && <SiteSettingsPanel />}
+
               {activeTab === "ai" && (
                 <div className="bg-app-surface rounded-3xl border border-app-border p-8 shadow-sm">
                   <AISettingsPanel />
                 </div>
               )}
-              {activeTab !== "tasks" && activeTab !== "ai" && (
+
+              {activeTab !== "tasks" && activeTab !== "users" && activeTab !== "ai" && activeTab !== "site" && (
                 <div className="h-[50vh] flex flex-col items-center justify-center text-tx-tertiary gap-4 bg-app-surface/40 rounded-3xl border border-app-border border-dashed">
                   <div className="w-16 h-16 rounded-2xl bg-app-surface flex items-center justify-center border border-app-border shadow-sm">
                     <Activity size={32} className="opacity-20" />
@@ -180,8 +184,13 @@ function UserManagementView() {
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
-      await Promise.all([fetchSettings(), fetchUsers()]);
-      setIsLoading(false);
+      try {
+        await Promise.all([fetchSettings(), fetchUsers()]);
+      } catch (error) {
+        console.error("Initialization failed:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     init();
   }, [fetchSettings, fetchUsers]);

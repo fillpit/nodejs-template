@@ -68,6 +68,51 @@ auth.post("/login", async (c) => {
   });
 });
 
+// 注册
+auth.post("/register", async (c) => {
+  const body = await c.req.json();
+  const { username, password, email } = body as { username: string; password: string; email?: string };
+
+  if (!username || !password) {
+    return c.json({ error: "用户名和密码不能为空" }, 400);
+  }
+
+  const db = getDb();
+  
+  // 校验注册策略
+  const policy = db.prepare("SELECT value FROM system_settings WHERE key = 'registration_policy'").get() as { value: string } | undefined;
+  if (policy?.value !== "open") {
+    return c.json({ error: "系统当前已关闭注册" }, 403);
+  }
+
+  const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
+  if (existing) {
+    return c.json({ error: "该用户名已被使用" }, 409);
+  }
+
+  const id = uuid();
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  db.prepare("INSERT INTO users (id, username, email, passwordHash) VALUES (?, ?, ?, ?)").run(id, username, email || null, passwordHash);
+
+  // 注册成功后自动登录，返回 token
+  const token = jwt.sign(
+    { userId: id, username: username },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+
+  return c.json({
+    token,
+    user: {
+      id,
+      username,
+      email,
+      createdAt: new Date().toISOString(),
+    },
+  }, 201);
+});
+
 // 修改账号安全信息（用户名 + 密码）
 auth.post("/change-password", async (c) => {
   // auth 路由不经过 JWT 中间件，需要自行解析 token 获取 userId

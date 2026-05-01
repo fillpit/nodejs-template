@@ -75,6 +75,15 @@ function getSavedNoteListWidth(): number {
   return DEFAULT_NOTELIST_WIDTH;
 }
 
+function getSavedViewMode(): ViewMode {
+  try {
+    const saved = localStorage.getItem("nowen-view-mode") as ViewMode;
+    const validModes: ViewMode[] = ["dashboard", "notebook", "favorites", "trash", "all", "search", "tasks", "tag", "mindmaps", "ai-chat", "diary", "codex", "admin"];
+    if (saved && validModes.includes(saved)) return saved;
+  } catch {}
+  return "dashboard";
+}
+
 const initialState: AppState = {
   notebooks: [],
   notes: [],
@@ -82,7 +91,7 @@ const initialState: AppState = {
   tags: [],
   selectedNotebookId: null,
   selectedTagId: null,
-  viewMode: "all",
+  viewMode: getSavedViewMode(),
   searchQuery: "",
   sidebarCollapsed: false,
   sidebarWidth: getSavedSidebarWidth(),
@@ -112,6 +121,7 @@ function reducer(state: AppState, action: Action): AppState {
     case "SET_SELECTED_TAG":
       return { ...state, selectedTagId: action.payload };
     case "SET_VIEW_MODE":
+      try { localStorage.setItem("nowen-view-mode", action.payload); } catch {}
       return { ...state, viewMode: action.payload };
     case "SET_SEARCH_QUERY":
       return { ...state, searchQuery: action.payload };
@@ -174,27 +184,27 @@ export function useApp() {
 export function useAppActions() {
   const { dispatch } = useApp();
 
-  return {
-    setNotebooks: useCallback((v: Notebook[]) => dispatch({ type: "SET_NOTEBOOKS", payload: v }), [dispatch]),
-    setNotes: useCallback((v: NoteListItem[]) => dispatch({ type: "SET_NOTES", payload: v }), [dispatch]),
-    setActiveNote: useCallback((v: Note | null) => dispatch({ type: "SET_ACTIVE_NOTE", payload: v }), [dispatch]),
-    setTags: useCallback((v: Tag[]) => dispatch({ type: "SET_TAGS", payload: v }), [dispatch]),
-    setSelectedNotebook: useCallback((v: string | null) => dispatch({ type: "SET_SELECTED_NOTEBOOK", payload: v }), [dispatch]),
-    setSelectedTag: useCallback((v: string | null) => dispatch({ type: "SET_SELECTED_TAG", payload: v }), [dispatch]),
-    setViewMode: useCallback((v: ViewMode) => dispatch({ type: "SET_VIEW_MODE", payload: v }), [dispatch]),
-    setSearchQuery: useCallback((v: string) => dispatch({ type: "SET_SEARCH_QUERY", payload: v }), [dispatch]),
-    toggleSidebar: useCallback(() => dispatch({ type: "TOGGLE_SIDEBAR" }), [dispatch]),
-    setSidebarWidth: useCallback((v: number) => dispatch({ type: "SET_SIDEBAR_WIDTH", payload: v }), [dispatch]),
-    setNoteListWidth: useCallback((v: number) => dispatch({ type: "SET_NOTELIST_WIDTH", payload: v }), [dispatch]),
-    setLoading: useCallback((v: boolean) => dispatch({ type: "SET_LOADING", payload: v }), [dispatch]),
-    updateNoteInList: useCallback((v: Partial<NoteListItem> & { id: string }) => dispatch({ type: "UPDATE_NOTE_IN_LIST", payload: v }), [dispatch]),
-    setSyncStatus: useCallback((v: SyncStatus) => dispatch({ type: "SET_SYNC_STATUS", payload: v }), [dispatch]),
-    setLastSynced: useCallback((v: string) => dispatch({ type: "SET_LAST_SYNCED", payload: v }), [dispatch]),
-    setMobileView: useCallback((v: MobileView) => dispatch({ type: "SET_MOBILE_VIEW", payload: v }), [dispatch]),
-    setMobileSidebar: useCallback((v: boolean) => dispatch({ type: "SET_MOBILE_SIDEBAR", payload: v }), [dispatch]),
-    setUser: useCallback((v: User | null) => dispatch({ type: "SET_USER", payload: v }), [dispatch]),
-    refreshNotebooks: useCallback(() => {
+  return React.useMemo(() => ({
+    setNotebooks: (v: Notebook[]) => dispatch({ type: "SET_NOTEBOOKS", payload: v }),
+    setNotes: (v: NoteListItem[]) => dispatch({ type: "SET_NOTES", payload: v }),
+    setActiveNote: (v: Note | null) => dispatch({ type: "SET_ACTIVE_NOTE", payload: v }),
+    setTags: (v: Tag[]) => dispatch({ type: "SET_TAGS", payload: v }),
+    setSelectedNotebook: (v: string | null) => dispatch({ type: "SET_SELECTED_NOTEBOOK", payload: v }),
+    setSelectedTag: (v: string | null) => dispatch({ type: "SET_SELECTED_TAG", payload: v }),
+    setViewMode: (v: ViewMode) => dispatch({ type: "SET_VIEW_MODE", payload: v }),
+    setSearchQuery: (v: string) => dispatch({ type: "SET_SEARCH_QUERY", payload: v }),
+    toggleSidebar: () => dispatch({ type: "TOGGLE_SIDEBAR" }),
+    setSidebarWidth: (v: number) => dispatch({ type: "SET_SIDEBAR_WIDTH", payload: v }),
+    setNoteListWidth: (v: number) => dispatch({ type: "SET_NOTELIST_WIDTH", payload: v }),
+    setLoading: (v: boolean) => dispatch({ type: "SET_LOADING", payload: v }),
+    updateNoteInList: (v: Partial<NoteListItem> & { id: string }) => dispatch({ type: "UPDATE_NOTE_IN_LIST", payload: v }),
+    setSyncStatus: (v: SyncStatus) => dispatch({ type: "SET_SYNC_STATUS", payload: v }),
+    setLastSynced: (v: string) => dispatch({ type: "SET_LAST_SYNCED", payload: v }),
+    setMobileView: (v: MobileView) => dispatch({ type: "SET_MOBILE_VIEW", payload: v }),
+    setMobileSidebar: (v: boolean) => dispatch({ type: "SET_MOBILE_SIDEBAR", payload: v }),
+    setUser: (v: User | null) => dispatch({ type: "SET_USER", payload: v }),
+    refreshNotebooks: () => {
       api.getNotebooks().then((v) => dispatch({ type: "SET_NOTEBOOKS", payload: v })).catch(console.error);
-    }, [dispatch]),
-  };
+    },
+  }), [dispatch]);
 }

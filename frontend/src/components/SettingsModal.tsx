@@ -1,16 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot } from "lucide-react";
+import { Palette, Shield, X, Settings, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ThemeToggle from "@/components/ThemeToggle";
 import SecuritySettings from "@/components/SecuritySettings";
-import AISettingsPanel from "@/components/AISettingsPanel";
 import { useSiteSettings, BUILTIN_FONTS, getBuiltinFontName } from "@/hooks/useSiteSettings";
 import { api } from "@/lib/api";
 import { CustomFont } from "@/types";
 import { cn } from "@/lib/utils";
 
-type TabId = "appearance" | "ai" | "security";
+type TabId = "appearance" | "security";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -19,12 +18,7 @@ interface SettingsModalProps {
 
 function AppearancePanel() {
   const { t, i18n } = useTranslation();
-  const { siteConfig, updateSiteConfig, updateEditorFont } = useSiteSettings();
-  const [title, setTitle] = useState(siteConfig.title);
-  const [previewIcon, setPreviewIcon] = useState(siteConfig.favicon);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { siteConfig, updateEditorFont } = useSiteSettings();
 
   // 字体状态
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
@@ -57,42 +51,7 @@ function AppearancePanel() {
     return () => document.removeEventListener("mousedown", handler);
   }, [fontDropdownOpen]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 1024 * 1024) {
-      setSaveMessage(t('settings.iconTooLarge'));
-      return;
-    }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewIcon(reader.result as string);
-      setSaveMessage("");
-    };
-    reader.readAsDataURL(file);
-  };
 
-  const handleRemoveIcon = () => {
-    setPreviewIcon("");
-    setSaveMessage("");
-  };
-
-  const handleSave = async () => {
-    if (!title.trim()) return;
-    setIsSaving(true);
-    setSaveMessage("");
-    try {
-      await updateSiteConfig(title.trim(), previewIcon);
-      setSaveMessage(t('settings.saveSuccess'));
-      setTimeout(() => setSaveMessage(""), 2000);
-    } catch {
-      setSaveMessage(t('settings.saveFailed'));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const hasChanges = title !== siteConfig.title || previewIcon !== siteConfig.favicon;
 
   // 当前字体的显示名
   const currentFontName = (() => {
@@ -148,88 +107,6 @@ function AppearancePanel() {
 
   return (
     <div className="space-y-6">
-      {/* 站点标识 */}
-      <div>
-        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1">{t('settings.siteIdentity')}</h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{t('settings.siteIdentityDesc')}</p>
-
-        <div className="flex flex-col sm:flex-row gap-6 items-start">
-          {/* Logo 上传区域 */}
-          <div className="flex flex-col items-center gap-2.5">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('settings.siteIcon')}</span>
-            <div
-              className="relative w-20 h-20 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center overflow-hidden group cursor-pointer hover:border-accent-primary transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {previewIcon ? (
-                <img src={previewIcon} alt="Site Icon" className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-1 text-zinc-400 dark:text-zinc-600">
-                  <Camera size={20} />
-                  <span className="text-[10px]">{t('settings.upload')}</span>
-                </div>
-              )}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Camera className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageChange}
-              accept="image/png,image/jpeg,image/svg+xml,image/x-icon,image/webp"
-              className="hidden"
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500">PNG/SVG/ICO · &lt;1MB</span>
-              {previewIcon && (
-                <button
-                  onClick={handleRemoveIcon}
-                  className="text-[10px] text-red-500 hover:text-red-400 transition-colors"
-                >
-                  {t('settings.remove')}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 站点名称 */}
-          <div className="flex-1 space-y-3 w-full">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('settings.siteName')}</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => { setTitle(e.target.value); setSaveMessage(""); }}
-                maxLength={20}
-                className="w-full px-3 py-2 bg-transparent border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-accent-primary/40 focus:border-accent-primary outline-none transition-all placeholder:text-zinc-400"
-                placeholder={t('settings.siteNamePlaceholder')}
-              />
-              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 text-right">{title.length} / 20</p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSave}
-                disabled={isSaving || !title.trim() || !hasChanges}
-                className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-accent-primary hover:bg-accent-primary/90 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {t('settings.saveChanges')}
-              </button>
-              {saveMessage && (
-                <span className={`text-xs ${saveMessage === t('settings.saveSuccess') ? "text-emerald-500" : "text-red-500"}`}>
-                  {saveMessage}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 分割线 */}
-      <div className="h-px bg-zinc-200 dark:bg-zinc-800" />
-
       {/* 外观与主题 */}
       <div>
         <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1">{t('settings.appearanceTheme')}</h3>
@@ -410,7 +287,6 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
 
   const SETTING_TABS = [
     { id: "appearance" as const, label: t('settings.appearance'), icon: Palette },
-    { id: "ai" as const, label: t('settings.ai'), icon: Bot },
     { id: "security" as const, label: t('settings.security'), icon: Shield },
   ];
 
@@ -526,7 +402,6 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
                 transition={{ duration: 0.15 }}
               >
                 {activeTab === "appearance" && <AppearancePanel />}
-                {activeTab === "ai" && <AISettingsPanel />}
                 {activeTab === "security" && <SecuritySettings />}
               </motion.div>
             </AnimatePresence>
