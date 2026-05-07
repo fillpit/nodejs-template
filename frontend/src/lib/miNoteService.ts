@@ -47,8 +47,19 @@ export async function fetchMiNotes(cookie: string): Promise<{
   folders: Record<string, string>;
 }> {
   const res = await api.miCloudNotes(cookie);
+  const rawNotes = res.notes as Record<string, unknown>[];
   return {
-    notes: res.notes.map((n: any) => ({ ...n, selected: true })),
+    notes: rawNotes.map((n) => ({
+      id: String(n.id ?? ""),
+      title: String(n.title ?? ""),
+      snippet: String(n.snippet ?? ""),
+      folderId: String(n.folderId ?? ""),
+      folderName: String(n.folderName ?? ""),
+      createDate: Number(n.createDate ?? 0),
+      modifyDate: Number(n.modifyDate ?? 0),
+      colorId: Number(n.colorId ?? 0),
+      selected: true,
+    })),
     folders: res.folders,
   };
 }

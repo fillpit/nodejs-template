@@ -37,7 +37,7 @@ function getAISettings(): AISettings {
   const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'ai_%'").all() as { key: string; value: string }[];
   const result: AISettings = { ...AI_DEFAULTS };
   for (const row of rows) {
-    (result as any)[row.key] = row.value;
+    ((result as unknown) as Record<string, string | undefined>)[row.key] = row.value;
   }
   // Docker 环境下自动替换 Ollama localhost URL 为内部容器 URL
   if (OLLAMA_DOCKER_URL && result.ai_provider === "ollama" && result.ai_api_url.includes("localhost:11434")) {
@@ -50,7 +50,7 @@ function getAISettings(): AISettings {
 ai.get("/settings", (c) => {
   const settings = getAISettings();
   // 不返回完整 API Key，只返回掩码
-  const response: any = {
+  const response: Record<string, unknown> = {
     ...settings,
     ai_api_key: settings.ai_api_key ? "sk-****" + settings.ai_api_key.slice(-4) : "",
     ai_api_key_set: !!settings.ai_api_key,
@@ -157,8 +157,9 @@ ai.post("/test", async (c) => {
     }
 
     return c.json({ success: true, message: "连接成功" });
-  } catch (err: any) {
-    return c.json({ success: false, error: err.message || "连接失败" }, 500);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ success: false, error: message || "连接失败" }, 500);
   }
 });
 
@@ -185,7 +186,7 @@ ai.get("/models", async (c) => {
     }
 
     const data = await res.json();
-    const models = (data.data || data.models || []).map((m: any) => ({
+    const models = (data.data || data.models || []).map((m: { id?: string; name?: string }) => ({
       id: m.id || m.name,
       name: m.id || m.name,
     }));
@@ -263,8 +264,6 @@ ai.post("/chat", async (c) => {
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   
-  // 使用场景特定配置（如果有），否则使用全局配置
-  const provider = settings.ai_chat_provider || settings.ai_provider;
   const apiUrl = (settings.ai_chat_api_url || settings.ai_api_url).replace(/\/+$/, "");
   const apiKey = settings.ai_chat_api_key || settings.ai_api_key;
   const model = settings.ai_chat_model || settings.ai_model;
@@ -293,7 +292,11 @@ ai.post("/chat", async (c) => {
 
     // SSE streaming
     return streamSSE(c, async (stream) => {
-      const reader = res.body!.getReader();
+      if (!res.body) {
+        await stream.writeSSE({ data: "AI 响应没有正文内容", event: "error" });
+        return;
+      }
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 
@@ -326,12 +329,13 @@ ai.post("/chat", async (c) => {
           }
         }
         await stream.writeSSE({ data: "[DONE]", event: "done" });
-      } catch (err) {
+      } catch {
         await stream.writeSSE({ data: "流式传输中断", event: "error" });
       }
     });
-  } catch (err: any) {
-    return c.json({ error: err.message || "AI 请求失败" }, 500);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: message || "AI 请求失败" }, 500);
   }
 });
 // ===== 知识库问答（流式 SSE） =====
@@ -346,7 +350,6 @@ ai.post("/ask", async (c) => {
     return c.json({ error: "问题不能为空" }, 400);
   }
 
-  const provider = settings.ai_chat_provider || settings.ai_provider;
   const apiUrl = (settings.ai_chat_api_url || settings.ai_api_url).replace(/\/+$/, "");
   const apiKey = settings.ai_chat_api_key || settings.ai_api_key;
   const model = settings.ai_chat_model || settings.ai_model;
@@ -383,8 +386,13 @@ ai.post("/ask", async (c) => {
       return c.json({ error: `AI 服务错误: ${res.status} ${err.slice(0, 200)}` }, 502);
     }
 
+    const responseBody = res.body;
+    if (!responseBody) {
+      return c.json({ error: "AI 响应没有正文内容" }, 500);
+    }
+
     return streamSSE(c, async (stream) => {
-      const reader = res.body!.getReader();
+      const reader = responseBody.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 
@@ -418,12 +426,13 @@ ai.post("/ask", async (c) => {
           }
         }
         await stream.writeSSE({ data: "[DONE]", event: "done" });
-      } catch (err) {
+      } catch {
         await stream.writeSSE({ data: "流式传输中断", event: "error" });
       }
     });
-  } catch (err: any) {
-    return c.json({ error: err.message || "AI 请求失败" }, 500);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: message || "AI 请求失败" }, 500);
   }
 });
 
@@ -432,7 +441,7 @@ ai.get("/knowledge-stats", (c) => {
   const db = getDb();
   // 由于目前是模板项目，核心业务表（notes, notebooks 等）可能不存在
   // 我们通过 try-catch 来安全地获取统计，如果表不存在则返回 0
-  let stats = {
+  const stats = {
     noteCount: 0,
     ftsCount: 0,
     notebookCount: 0,
@@ -442,13 +451,13 @@ ai.get("/knowledge-stats", (c) => {
   };
 
   try {
-    const noteCount = db.prepare("SELECT COUNT(*) as count FROM notes WHERE isTrashed = 0").get() as any;
+    const noteCount = db.prepare("SELECT COUNT(*) as count FROM notes WHERE isTrashed = 0").get() as { count?: number } | undefined;
     stats.noteCount = noteCount?.count || 0;
     
-    const notebookCount = db.prepare("SELECT COUNT(*) as count FROM notebooks").get() as any;
+    const notebookCount = db.prepare("SELECT COUNT(*) as count FROM notebooks").get() as { count?: number } | undefined;
     stats.notebookCount = notebookCount?.count || 0;
 
-    const tagCount = db.prepare("SELECT COUNT(*) as count FROM tags").get() as any;
+    const tagCount = db.prepare("SELECT COUNT(*) as count FROM tags").get() as { count?: number } | undefined;
     stats.tagCount = tagCount?.count || 0;
   } catch {
     // 表不存在，保持为 0

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Lock, User, BookOpen, Globe, CheckCircle2, AlertCircle, Mail } from "lucide-react";
+import { Loader2, Lock, User as UserIcon, BookOpen, Globe, CheckCircle2, AlertCircle, Mail } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getServerUrl, setServerUrl, clearServerUrl, testServerConnection } from "@/lib/api";
+import { User } from "@/types";
 
 interface LoginPageProps {
-  onLogin: (token: string, user: any) => void;
+  onLogin: (token: string, user: User) => void;
   /** 是否为客户端模式（Electron / Android / 曾配置过服务器地址） */
   isClientMode?: boolean;
   onDisconnect?: () => void;
@@ -71,7 +72,7 @@ export default function LoginPage({ onLogin, isClientMode = false, onDisconnect 
           const data = await res.json();
           setRegistrationPolicy(data.registration_policy || "closed");
         }
-      } catch { }
+      } catch { /* ignore */ }
     } else {
       setServerStatus("fail");
     }
@@ -248,7 +249,7 @@ export default function LoginPage({ onLogin, isClientMode = false, onDisconnect 
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+                  <UserIcon className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                 </div>
                 <input
                   type="text"

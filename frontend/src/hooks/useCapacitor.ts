@@ -32,7 +32,7 @@ export function useBackButton({
   useEffect(() => {
     if (!isNativePlatform()) return;
 
-    const handler = CapApp.addListener("backButton", ({ canGoBack }) => {
+    const handler = CapApp.addListener("backButton", () => {
       // 层级 1：侧边栏打开 → 关闭侧边栏
       if (mobileSidebarOpen) {
         onCloseSidebar();
@@ -83,7 +83,7 @@ export function useStatusBarSync() {
     // 确保状态栏不覆盖 WebView 内容（状态栏占据独立空间，不盖住返回按钮）
     // 延迟执行确保原生层已就绪
     const ensureNoOverlay = () => {
-      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => { /* ignore */ });
     };
     ensureNoOverlay();
     // 延迟再执行一次，防止初始化时序问题
@@ -93,10 +93,10 @@ export function useStatusBarSync() {
       const isDark = document.documentElement.classList.contains("dark");
       StatusBar.setStyle({
         style: isDark ? Style.Dark : Style.Light,
-      }).catch(() => {});
+      }).catch(() => { /* ignore */ });
       StatusBar.setBackgroundColor({
         color: isDark ? "#0d1117" : "#ffffff",
-      }).catch(() => {});
+      }).catch(() => { /* ignore */ });
     };
 
     // 初始化时立即执行一次
@@ -174,43 +174,43 @@ export const haptic = {
   /** 轻触反馈 - 用于普通点击操作（切换收藏、置顶等） */
   light: () => {
     if (!isNativePlatform()) return;
-    Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+    Haptics.impact({ style: ImpactStyle.Light }).catch(() => { /* ignore */ });
   },
 
   /** 中等反馈 - 用于重要操作（删除、移动笔记等） */
   medium: () => {
     if (!isNativePlatform()) return;
-    Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
+    Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { /* ignore */ });
   },
 
   /** 重度反馈 - 用于危险操作确认（永久删除等） */
   heavy: () => {
     if (!isNativePlatform()) return;
-    Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+    Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => { /* ignore */ });
   },
 
   /** 成功通知 - 用于操作成功（保存完成、同步成功等） */
   success: () => {
     if (!isNativePlatform()) return;
-    Haptics.notification({ type: NotificationType.Success }).catch(() => {});
+    Haptics.notification({ type: NotificationType.Success }).catch(() => { /* ignore */ });
   },
 
   /** 警告通知 - 用于提醒操作（双击返回退出提示等） */
   warning: () => {
     if (!isNativePlatform()) return;
-    Haptics.notification({ type: NotificationType.Warning }).catch(() => {});
+    Haptics.notification({ type: NotificationType.Warning }).catch(() => { /* ignore */ });
   },
 
   /** 错误通知 - 用于操作失败（保存失败、网络错误等） */
   error: () => {
     if (!isNativePlatform()) return;
-    Haptics.notification({ type: NotificationType.Error }).catch(() => {});
+    Haptics.notification({ type: NotificationType.Error }).catch(() => { /* ignore */ });
   },
 
   /** 选择反馈 - 用于列表项选中、切换开关等 */
   selection: () => {
     if (!isNativePlatform()) return;
-    Haptics.selectionStart().catch(() => {});
-    Haptics.selectionEnd().catch(() => {});
+    Haptics.selectionStart().catch(() => { /* ignore */ });
+    Haptics.selectionEnd().catch(() => { /* ignore */ });
   },
 };

@@ -40,7 +40,7 @@ users.delete("/:id", (c) => {
   const id = c.req.param("id");
   const db = getDb();
 
-  const user = db.prepare("SELECT username FROM users WHERE id = ?").get(id) as any;
+  const user = db.prepare("SELECT username FROM users WHERE id = ?").get(id) as { username: string } | undefined;
   if (!user) return c.json({ error: "用户不存在" }, 404);
   if (user.username === "admin") return c.json({ error: "管理员账号不可删除" }, 403);
 

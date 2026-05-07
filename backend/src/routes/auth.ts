@@ -21,7 +21,7 @@ auth.post("/login", async (c) => {
   const db = getDb();
   const user = db.prepare(
     "SELECT id, username, email, avatarUrl, passwordHash, createdAt FROM users WHERE username = ?"
-  ).get(username) as any;
+  ).get(username) as { id: string; username: string; email: string | null; avatarUrl: string | null; passwordHash: string; createdAt: string } | undefined;
 
   if (!user) {
     return c.json({ error: "用户名或密码错误" }, 401);
@@ -150,7 +150,7 @@ auth.post("/change-password", async (c) => {
   }
 
   const db = getDb();
-  const user = db.prepare("SELECT id, username, passwordHash FROM users WHERE id = ?").get(userId) as any;
+  const user = db.prepare("SELECT id, username, passwordHash FROM users WHERE id = ?").get(userId) as { id: string; username: string; passwordHash: string } | undefined;
   if (!user) return c.json({ error: "用户不存在" }, 404);
 
   // 校验当前密码
@@ -169,7 +169,7 @@ auth.post("/change-password", async (c) => {
 
   // 检查新用户名是否冲突
   if (newUsername && newUsername !== user.username) {
-    const existing = db.prepare("SELECT id FROM users WHERE username = ? AND id != ?").get(newUsername, userId) as any;
+    const existing = db.prepare("SELECT id FROM users WHERE username = ? AND id != ?").get(newUsername, userId) as { id: string } | undefined;
     if (existing) {
       return c.json({ error: "该用户名已被使用" }, 409);
     }
@@ -177,7 +177,7 @@ auth.post("/change-password", async (c) => {
 
   // 执行更新
   const updates: string[] = [];
-  const params: any[] = [];
+  const params: unknown[] = [];
 
   if (newUsername && newUsername !== user.username) {
     updates.push("username = ?");
@@ -269,7 +269,7 @@ auth.get("/verify", (c) => {
     const db = getDb();
     const user = db.prepare(
       "SELECT id, username, email, avatarUrl, createdAt FROM users WHERE id = ?"
-    ).get(decoded.userId) as any;
+    ).get(decoded.userId) as { id: string; username: string; email: string | null; avatarUrl: string | null; createdAt: string } | undefined;
 
     if (!user) return c.json({ error: "用户不存在" }, 401);
 

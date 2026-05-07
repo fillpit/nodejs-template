@@ -81,7 +81,7 @@ class AuditLogger {
     level?: AuditLevel;
     targetType?: string;
     targetId?: string;
-    details?: string | Record<string, any>;
+    details?: string | Record<string, unknown>;
     ip?: string;
     userAgent?: string;
   }): void {
@@ -107,8 +107,9 @@ class AuditLogger {
         params.ip || "",
         params.userAgent || "",
       );
-    } catch (err: any) {
-      console.error("[Audit] 日志记录失败:", err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[Audit] 日志记录失败:", message);
     }
   }
 
@@ -126,7 +127,7 @@ class AuditLogger {
   }): { logs: AuditEntry[]; total: number } {
     const db = getDb();
     const conditions: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
 
     if (params.userId) { conditions.push("userId = ?"); values.push(params.userId); }
     if (params.category) { conditions.push("category = ?"); values.push(params.category); }
@@ -140,7 +141,7 @@ class AuditLogger {
     const limit = Math.min(params.limit || 50, 200);
     const offset = params.offset || 0;
 
-    const total = (db.prepare(`SELECT COUNT(*) as count FROM audit_logs ${where}`).get(...values) as any).count;
+    const total = (db.prepare(`SELECT COUNT(*) as count FROM audit_logs ${where}`).get(...values) as { count: number } | undefined)?.count || 0;
     const logs = db.prepare(
       `SELECT * FROM audit_logs ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`
     ).all(...values, limit, offset) as AuditEntry[];
@@ -166,7 +167,7 @@ export function logAudit(
   userId: string,
   category: AuditCategory,
   action: string,
-  details?: string | Record<string, any>,
+  details?: string | Record<string, unknown>,
   extra?: { targetType?: string; targetId?: string; ip?: string; userAgent?: string; level?: AuditLevel }
 ): void {
   auditLogger.log({

@@ -113,7 +113,7 @@ class WebhookDispatcher {
   }
 
   /** 触发事件 — 异步推送所有匹配的 Webhook */
-  async emit(event: WebhookEvent, userId: string, data: Record<string, any>): Promise<void> {
+  async emit(event: WebhookEvent, userId: string, data: Record<string, unknown>): Promise<void> {
     try {
       const db = getDb();
       const webhooks = db.prepare(
@@ -121,16 +121,18 @@ class WebhookDispatcher {
       ).all(userId) as WebhookConfig[];
 
       for (const webhook of webhooks) {
-        const events: string[] = JSON.parse(webhook.events as any);
+        const events: string[] = JSON.parse(webhook.events as unknown as string);
         if (events.includes("*") || events.includes(event)) {
           // 异步投递，不阻塞
           this.deliver(webhook, event, data).catch(err => {
-            console.error(`[Webhook] 投递失败 ${webhook.id}:`, err.message);
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[Webhook] 投递失败 ${webhook.id}:`, message);
           });
         }
       }
-    } catch (err: any) {
-      console.error("[Webhook] 事件分发错误:", err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[Webhook] 事件分发错误:", message);
     }
   }
 
@@ -138,7 +140,7 @@ class WebhookDispatcher {
   private async deliver(
     webhook: WebhookConfig,
     event: WebhookEvent,
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     maxRetries: number = 3,
   ): Promise<void> {
     const db = getDb();
@@ -182,8 +184,8 @@ class WebhookDispatcher {
           success = true;
           break;
         }
-      } catch (err: any) {
-        lastBody = err.message;
+      } catch (err) {
+        lastBody = err instanceof Error ? err.message : String(err);
       }
 
       // 指数退避
@@ -216,6 +218,6 @@ class WebhookDispatcher {
 export const webhookDispatcher = WebhookDispatcher.getInstance();
 
 /** 便捷方法：触发事件 */
-export function emitWebhook(event: WebhookEvent, userId: string, data: Record<string, any>): void {
+export function emitWebhook(event: WebhookEvent, userId: string, data: Record<string, unknown>): void {
   webhookDispatcher.emit(event, userId, data);
 }

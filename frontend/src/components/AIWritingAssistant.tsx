@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Sparkles, PenLine, RefreshCw, Shrink, Expand, Languages,
-  FileText, HelpCircle, Wrench, Copy, Check, X, Loader2,
-  ArrowRight, Replace, ChevronDown, Code2, LetterText, MessageSquarePlus, Send
+  FileText, HelpCircle, Wrench, Copy, Check, X,
+  ArrowRight, Replace, Code2, LetterText, MessageSquarePlus, Send
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 type AIAction = "continue" | "rewrite" | "polish" | "shorten" | "expand" | "translate_en" | "translate_zh" | "summarize" | "explain" | "fix_grammar" | "format_markdown" | "format_code" | "custom";
 
@@ -72,8 +71,9 @@ export default function AIWritingAssistant({
         },
         action === "custom" ? prompt : undefined
       );
-    } catch (err: any) {
-      setError(err.message || t("ai.requestFailed"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || t("ai.requestFailed"));
     } finally {
       setIsLoading(false);
     }

@@ -1,12 +1,8 @@
 import React from "react";
-import { useTranslation } from "react-i18next";
-import { useApp } from "@/store/AppContext";
 import { Layers, Users, Activity, BarChart4 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
-  const { t } = useTranslation();
-  const { state } = useApp();
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center bg-app-bg text-tx-primary p-8 overflow-y-auto">

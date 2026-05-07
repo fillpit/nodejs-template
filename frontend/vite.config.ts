@@ -28,12 +28,10 @@ export default defineConfig({
           'vendor-ui': [
             'framer-motion',
             'lucide-react',
-            'react-icons',
           ],
           'vendor-utils': [
             'react-markdown',
             'remark-gfm',
-            'date-fns',
             'i18next',
             'react-i18next',
           ],

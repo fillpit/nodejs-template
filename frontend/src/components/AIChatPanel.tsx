@@ -42,7 +42,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
 
   // 加载知识库统计
   useEffect(() => {
-    api.getKnowledgeStats().then(setStats).catch(() => {});
+    api.getKnowledgeStats().then(setStats).catch(() => { /* ignore */ });
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -98,10 +98,11 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
           ));
         }
       );
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       setMessages(prev => prev.map(m =>
         m.id === assistantMsg.id
-          ? { ...m, content: err.message || t("ai.requestFailed") }
+          ? { ...m, content: message || t("ai.requestFailed") }
           : m
       ));
     } finally {
@@ -140,8 +141,9 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
     try {
       const result = await api.parseDocument(file, { formatMode: "note" });
       setDocResult(result.markdown);
-    } catch (err: any) {
-      setDocResult(`❌ ${err.message}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setDocResult(`❌ ${message}`);
     } finally {
       setDocParsing(false);
       if (docInputRef.current) docInputRef.current.value = "";
@@ -168,9 +170,10 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
       const result = await api.importToKnowledge(Array.from(files));
       setImportResult(t("aiChat.importSuccess", { success: result.success, failed: result.failed }));
       // 刷新统计
-      api.getKnowledgeStats().then(setStats).catch(() => {});
-    } catch (err: any) {
-      setImportResult(`❌ ${err.message}`);
+      api.getKnowledgeStats().then(setStats).catch(() => { /* ignore */ });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setImportResult(`❌ ${message}`);
     } finally {
       setImportLoading(false);
       if (importInputRef.current) importInputRef.current.value = "";
@@ -196,8 +199,9 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
       }
       const result = await api.batchFormatNotes(validIds);
       setBatchResult(t("aiChat.formatSuccess", { success: result.success, failed: result.failed }));
-    } catch (err: any) {
-      setBatchResult(`❌ ${err.message}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setBatchResult(`❌ ${message}`);
     } finally {
       setBatchLoading(false);
     }

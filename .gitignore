@@ -17,3 +17,10 @@ frontend/android/build_output.txt
 frontend/.pnpm-store/
 backend/.pnpm-store/
 .pnpm-store/
+.npm-cache/
+frontend/.npm-cache/
+backend/.npm-cache/
+.cache/
+.prisma_cache/
+.home/
+.pnpm-home/

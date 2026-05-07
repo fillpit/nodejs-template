@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Shield, Key, Loader2, CheckCircle2, Eye, EyeOff, User, Camera } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
@@ -30,7 +30,7 @@ export default function SecuritySettings() {
       setCurrentUser(user);
       setPreviewAvatar(user.avatarUrl || "");
       setNewUsername(user.username);
-    }).catch(() => {});
+    }).catch(() => { /* ignore */ });
   }, []);
 
   const triggerShake = (msg: string) => {
@@ -104,8 +104,9 @@ export default function SecuritySettings() {
         setCurrentUser(updatedUser);
         actions.setUser(updatedUser);
       }
-    } catch (err: any) {
-      triggerShake(err.message || t('securitySettings.updateFailed'));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      triggerShake(message || t('securitySettings.updateFailed'));
     } finally {
       setIsLoading(false);
     }

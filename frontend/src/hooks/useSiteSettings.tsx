@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import i18n from "i18next";
 import { api } from "@/lib/api";
@@ -38,8 +39,8 @@ interface SiteSettingsContextValue {
 
 const SiteSettingsContext = createContext<SiteSettingsContextValue>({
   siteConfig: DEFAULT_CONFIG,
-  updateSiteConfig: async () => {},
-  updateEditorFont: async () => {},
+  updateSiteConfig: async () => { /* no-op */ },
+  updateEditorFont: async () => { /* no-op */ },
   isLoaded: false,
 });
 

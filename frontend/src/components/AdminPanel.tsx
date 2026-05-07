@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Shield, Activity, ListOrdered, Settings, User, Globe, Bot, Users,
-  BarChart4, HardDrive, AlertCircle, Info, Lock, UserPlus, RefreshCw, Plus,
-  ChevronRight, ExternalLink, Mail, Check, AlertTriangle, PenLine,
-  ArrowLeft
+  Shield, Activity, Globe, Bot, Users,
+  AlertCircle, Info, Lock, UserPlus, RefreshCw, Plus,
+  Mail, Check, AlertTriangle, ArrowLeft
 } from "lucide-react";
+import { User } from "@/types";
 import { cn } from "@/lib/utils";
 import AISettingsPanel from "./AISettingsPanel";
 import SiteSettingsPanel from "./SiteSettingsPanel";
-import { useApp, useAppActions } from "@/store/AppContext";
+import { useAppActions } from "@/store/AppContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 
@@ -29,10 +29,8 @@ interface SidebarGroup {
 }
 
 export default function AdminPanel() {
-  const { state } = useApp();
   const actions = useAppActions();
   const [activeTab, setActiveTab] = useState<AdminTab>("users");
-  const currentUser = state.user;
 
   const sidebarGroups: SidebarGroup[] = [
     {
@@ -153,11 +151,11 @@ export default function AdminPanel() {
   );
 }
 
-// ─── 子页面：用户管理 ──────────────────────────────────────────────────────
+
 
 function UserManagementView() {
   const [regPolicy, setRegPolicy] = useState<"open" | "invite" | "closed">("closed");
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -210,8 +208,9 @@ function UserManagementView() {
       await api.updateSiteSettings({ registration_policy: newPolicy });
       setRegPolicy(newPolicy);
       setMessage({ type: 'success', text: "注册策略已更新" });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || "更新失败" });
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : String(error);
+      setMessage({ type: 'error', text: messageText || "更新失败" });
     } finally {
       setIsUpdating(false);
     }
@@ -225,12 +224,13 @@ function UserManagementView() {
       await api.deleteUser(id);
       setUsers(prev => prev.filter(u => u.id !== id));
       setMessage({ type: 'success', text: `用户 ${username} 已删除` });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || "删除失败" });
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : String(error);
+      setMessage({ type: 'error', text: messageText || "删除失败" });
     }
   };
 
-  const policies = [
+  const policies: { id: "open" | "invite" | "closed"; title: string; desc: string; icon: React.ReactNode }[] = [
     { id: "open", title: "开放注册", desc: "任何人都可以自行注册", icon: <Globe size={20} /> },
     { id: "invite", title: "邀请制", desc: "仅管理员可以创建新用户", icon: <UserPlus size={20} /> },
     { id: "closed", title: "关闭注册", desc: "不再允许新用户加入", icon: <Lock size={20} /> },
@@ -275,7 +275,7 @@ function UserManagementView() {
             <button
               key={p.id}
               disabled={isUpdating}
-              onClick={() => handlePolicyChange(p.id as any)}
+              onClick={() => handlePolicyChange(p.id)}
               className={cn(
                 "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left relative overflow-hidden group",
                 regPolicy === p.id
@@ -395,7 +395,7 @@ function UserManagementView() {
 
 // ─── 子组件：添加用户弹窗 ──────────────────────────────────────────────────
 
-function AddUserModal({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose: () => void, onSuccess: (user: any) => void }) {
+function AddUserModal({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose: () => void, onSuccess: (user: User) => void }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -414,8 +414,9 @@ function AddUserModal({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose
       setUsername("");
       setEmail("");
       setPassword("");
-    } catch (err: any) {
-      setError(err.message || "创建用户失败");
+    } catch (err) {
+      const messageText = err instanceof Error ? err.message : String(err);
+      setError(messageText || "创建用户失败");
     } finally {
       setIsSubmitting(false);
     }

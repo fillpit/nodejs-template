@@ -31,7 +31,7 @@ export default function ContextMenu({
     if (menuRef && "current" in menuRef) {
       (menuRef as React.MutableRefObject<HTMLDivElement | null>).current = internalRef.current;
     }
-  });
+  }, [menuRef]);
 
   // 位置边界修正：防止菜单超出屏幕
   useEffect(() => {

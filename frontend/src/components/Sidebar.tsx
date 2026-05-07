@@ -20,10 +20,11 @@ export default function Sidebar() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const user = state.user;
 
-  const navItems: { icon: React.ReactNode; label: string; mode: ViewMode; active: boolean; badge?: string }[] = [
+  const rawNavItems: { icon: React.ReactNode; label: string; mode: ViewMode; active: boolean; badge?: string }[] = [
     { icon: <LayoutDashboard size={16} />, label: t('sidebar.dashboard', "仪表盘"), mode: "dashboard", active: state.viewMode === "dashboard" },
     { icon: <Bot size={16} />, label: "AI 秘书", mode: "ai-chat", active: state.viewMode === "ai-chat" },
-  ].filter(item => item.mode !== "system-tasks" || user?.username === 'admin');
+  ];
+  const navItems = rawNavItems;
 
   if (state.sidebarCollapsed) {
     return (
@@ -162,7 +163,6 @@ export default function Sidebar() {
           <button
             key={item.mode}
             onClick={() => {
-              // @ts-ignore
               actions.setViewMode(item.mode);
               actions.setMobileSidebar(false);
             }}

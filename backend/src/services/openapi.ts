@@ -5,7 +5,7 @@
  * 提供 /api/openapi.json 端点供 Swagger UI 等工具消费。
  */
 
-export function generateOpenAPISpec(): Record<string, any> {
+export function generateOpenAPISpec(): Record<string, unknown> {
   return {
     openapi: "3.0.3",
     info: {

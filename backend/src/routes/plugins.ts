@@ -47,7 +47,7 @@ pluginsRouter.get("/actions", async (c) => {
   const loader = getPluginLoader();
   const plugins = loader.listPlugins();
 
-  const actions: { action: string; pluginName: string; description: string; params?: any[] }[] = [];
+  const actions: { action: string; pluginName: string; description: string; params?: unknown[] }[] = [];
   for (const p of plugins) {
     if (p.status !== "active") continue;
     for (const cap of p.capabilities) {
@@ -76,7 +76,7 @@ pluginsRouter.post("/:name/execute", async (c) => {
     name,
     params,
     {
-      log: () => {},
+      log: () => { /* no-op */ },
       userId,
       apiBaseUrl: "",
       apiToken: "",

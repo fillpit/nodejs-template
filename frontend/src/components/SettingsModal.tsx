@@ -85,8 +85,9 @@ function AppearancePanel() {
       setUploadSuccess(result.uploaded.length > 0);
       await loadFonts();
       setTimeout(() => { setUploadMessage(""); setUploadSuccess(false); }, 4000);
-    } catch (err: any) {
-      setUploadMessage(err.message || t('settings.fontUploadFailed'));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setUploadMessage(message || t('settings.fontUploadFailed'));
       setUploadSuccess(false);
     } finally {
       setIsUploading(false);

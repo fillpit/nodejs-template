@@ -62,12 +62,10 @@ export class BackupManager {
     const db = getDb();
 
     // 获取统计
-    const noteCount = (db.prepare("SELECT COUNT(*) as c FROM notes").get() as any).c;
-    const notebookCount = (db.prepare("SELECT COUNT(*) as c FROM notebooks").get() as any).c;
+    const noteCount = (db.prepare("SELECT COUNT(*) as c FROM notes").get() as { c: number } | undefined)?.c || 0;
+    const notebookCount = (db.prepare("SELECT COUNT(*) as c FROM notebooks").get() as { c: number } | undefined)?.c || 0;
 
     if (type === "db-only") {
-      // SQLite 在线备份
-      const dbPath = process.env.DB_PATH || path.join(this.dataDir, "nowen-note.db");
       await db.backup(backupPath);
     } else {
       // 全量备份：使用 JSON 导出（数据库表 + 元信息）
@@ -77,7 +75,7 @@ export class BackupManager {
         "note_versions", "share_comments", "custom_fonts",
       ];
 
-      const exportData: Record<string, any[]> = {};
+      const exportData: Record<string, unknown[]> = {};
       for (const table of tables) {
         try {
           exportData[table] = db.prepare(`SELECT * FROM ${table}`).all();
@@ -204,19 +202,20 @@ export class BackupManager {
             db.prepare(`DELETE FROM ${table}`).run();
 
             // 插入数据
-            const columns = Object.keys(rows[0]);
+            const columns = Object.keys(rows[0] as Record<string, unknown>);
             const placeholders = columns.map(() => "?").join(", ");
             const insert = db.prepare(
               `INSERT OR REPLACE INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})`
             );
 
             for (const row of rows) {
-              insert.run(...columns.map(c => (row as any)[c]));
+              insert.run(...columns.map(c => (row as Record<string, unknown>)[c]));
             }
 
             stats[table] = rows.length;
-          } catch (err: any) {
-            console.warn(`[Backup] 恢复表 ${table} 失败:`, err.message);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`[Backup] 恢复表 ${table} 失败:`, message);
           }
         }
       });
@@ -224,8 +223,9 @@ export class BackupManager {
       restore();
 
       return { success: true, stats };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, error: message };
     }
   }
 
@@ -246,8 +246,9 @@ export class BackupManager {
             this.deleteBackup(old.filename);
           }
         }
-      } catch (err: any) {
-        console.error("[Backup] 自动备份失败:", err.message);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[Backup] 自动备份失败:", message);
       }
     }, ms);
 

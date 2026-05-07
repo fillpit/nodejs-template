@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Capacitor } from "@capacitor/core";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
 import AdminPanel from "@/components/AdminPanel";
@@ -191,7 +192,7 @@ function AppLayout({ user }: { user: User }) {
           <MobileTopBar />
           <AIChatPanel
             onClose={() => actions.setViewMode("dashboard")}
-            onNavigateToNote={async () => {}}
+            onNavigateToNote={async () => { /* no-op */ }}
           />
         </div>
       ) : (
@@ -235,8 +236,8 @@ function AuthGate() {
     }
   }, [isAuthenticated]);
 
-  const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.() 
-    || !!(window as any).Capacitor?.platform && (window as any).Capacitor.platform !== "web";
+  const isCapacitor = Capacitor.isNativePlatform() 
+    || (Capacitor.getPlatform() !== "web");
   const isClientMode = window.location.protocol === "file:"
     || window.location.protocol === "capacitor:"
     || isCapacitor
@@ -310,10 +311,12 @@ function AuthGate() {
     );
   }
 
+  if (!user) return null;
+
   return (
     <AppProvider>
       <TooltipProvider>
-        <AppLayout user={user!} />
+        <AppLayout user={user} />
       </TooltipProvider>
     </AppProvider>
   );

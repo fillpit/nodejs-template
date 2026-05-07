@@ -31,8 +31,8 @@ export interface SkillParam {
   type: "string" | "number" | "boolean" | "select";
   description: string;
   required?: boolean;
-  default?: any;
-  options?: { label: string; value: any }[];
+  default?: unknown;
+  options?: { label: string; value: unknown }[];
 }
 
 export interface SkillContext {
@@ -45,7 +45,7 @@ export interface SkillContext {
 
 export interface SkillResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   text?: string;
   error?: string;
 }
@@ -57,7 +57,7 @@ export interface NowenSkill {
   author?: string;
   capabilities: SkillCapability[];
   init?(context: SkillContext): Promise<void>;
-  execute(context: SkillContext, params: Record<string, any>): Promise<SkillResult>;
+  execute(context: SkillContext, params: Record<string, unknown>): Promise<SkillResult>;
   destroy?(): Promise<void>;
 }
 
@@ -125,8 +125,9 @@ export class PluginLoader {
 
       try {
         await this.loadPlugin(pluginDir);
-      } catch (err: any) {
-        console.error(`[PluginLoader] 加载 ${entry.name} 失败:`, err.message);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[PluginLoader] 加载 ${entry.name} 失败:`, message);
       }
     }
 
@@ -146,9 +147,9 @@ export class PluginLoader {
 
     // 检查是否已加载
     if (this.plugins.has(manifest.name)) {
-      const existing = this.plugins.get(manifest.name)!;
+      const existing = this.plugins.get(manifest.name);
       // 先卸载旧版本
-      if (existing.skill.destroy) {
+      if (existing && existing.skill.destroy) {
         try { await existing.skill.destroy(); } catch { /* 忽略清理错误 */ }
       }
     }
@@ -172,14 +173,15 @@ export class PluginLoader {
       const moduleUrl = pathToFileURL(resolvedMain).href;
       const mod = await import(moduleUrl);
       skill = mod.default || mod;
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       const loaded: LoadedSkill = {
         manifest,
-        skill: null as any,
+        skill: null as unknown as NowenSkill,
         directory: pluginDir,
         loadedAt: new Date().toISOString(),
         status: "error",
-        error: `模块加载失败: ${err.message}`,
+        error: `模块加载失败: ${message}`,
       };
       this.plugins.set(manifest.name, loaded);
       throw err;
@@ -265,7 +267,7 @@ export class PluginLoader {
   /** 执行插件（带超时和错误隔离） */
   async executePlugin(
     name: string,
-    params: Record<string, any>,
+    params: Record<string, unknown>,
     context: SkillContext,
     timeoutMs: number = 30000,
   ): Promise<SkillResult> {
@@ -297,9 +299,10 @@ export class PluginLoader {
       // 保存日志
       this.logs.set(name, pluginLogs);
       return result;
-    } catch (err: any) {
-      this.logs.set(name, [...pluginLogs, `[ERROR] ${err.message}`]);
-      return { success: false, error: err.message };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logs.set(name, [...pluginLogs, `[ERROR] ${message}`]);
+      return { success: false, error: message };
     }
   }
 

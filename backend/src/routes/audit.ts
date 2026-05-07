@@ -7,8 +7,7 @@
  */
 
 import { Hono } from "hono";
-import { initAuditTables, auditLogger } from "../services/audit.js";
-import type { AuditCategory, AuditLevel } from "../services/audit.js";
+import { initAuditTables, auditLogger, type AuditCategory, type AuditLevel } from "../services/audit.js";
 
 const auditRouter = new Hono();
 
@@ -46,7 +45,7 @@ auditRouter.get("/stats", (c) => {
   const { getDb } = require("../db/schema");
   const db = getDb();
 
-  const total = (db.prepare("SELECT COUNT(*) as c FROM audit_logs").get() as any).c;
+  const total = (db.prepare("SELECT COUNT(*) as c FROM audit_logs").get() as { c: number } | undefined)?.c || 0;
 
   const byCategory = db.prepare(`
     SELECT category, COUNT(*) as count FROM audit_logs
@@ -66,7 +65,7 @@ auditRouter.get("/stats", (c) => {
   const today = new Date().toISOString().slice(0, 10);
   const todayCount = (db.prepare(
     "SELECT COUNT(*) as c FROM audit_logs WHERE createdAt >= ?"
-  ).get(today) as any).c;
+  ).get(today) as { c: number } | undefined)?.c || 0;
 
   return c.json({ total, todayCount, byCategory, byLevel, recent });
 });

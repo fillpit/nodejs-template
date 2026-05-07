@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, useCallback } from "react";
-import { Notebook, NoteListItem, Note, Tag, ViewMode } from "@/types";
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useReducer } from "react";
+import { Notebook, NoteListItem, Note, Tag, ViewMode, User } from "@/types";
 import { api } from "@/lib/api";
 
 export type SyncStatus = "idle" | "saving" | "saved" | "error";

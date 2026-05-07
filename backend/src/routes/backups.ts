@@ -32,8 +32,9 @@ backupsRouter.post("/", async (c) => {
       description: body.description,
     });
     return c.json(info, 201);
-  } catch (err: any) {
-    return c.json({ error: `备份失败: ${err.message}` }, 500);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `备份失败: ${message}` }, 500);
   }
 });
 

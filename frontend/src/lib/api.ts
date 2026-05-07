@@ -118,9 +118,9 @@ export const api = {
     request<{ success: boolean; message: string }>("/auth/factory-reset", { method: "POST", body: JSON.stringify({ confirmText }) }),
 
   // Export / Import
-  getExportNotes: () => request<any[]>("/export/notes"),
+  getExportNotes: () => request<unknown[]>("/export/notes"),
   importNotes: (notes: { title: string; content: string; contentText: string; createdAt?: string; updatedAt?: string }[], notebookId?: string) =>
-    request<{ success: boolean; count: number; notebookId: string; notes: any[] }>("/export/import", {
+    request<{ success: boolean; count: number; notebookId: string; notes: unknown[] }>("/export/import", {
       method: "POST",
       body: JSON.stringify({ notes, notebookId }),
     }),
@@ -167,7 +167,7 @@ export const api = {
       body: JSON.stringify({ cookie }),
     }),
   miCloudNotes: (cookie: string) =>
-    request<{ notes: any[]; folders: Record<string, string> }>("/micloud/notes", {
+    request<{ notes: unknown[]; folders: Record<string, string> }>("/micloud/notes", {
       method: "POST",
       body: JSON.stringify({ cookie }),
     }),
@@ -179,14 +179,14 @@ export const api = {
 
   // OPPO Cloud
   oppoCloudImport: (notes: { id: string; title: string; content: string }[], notebookId?: string) =>
-    request<{ success: boolean; count: number; notebookId: string; notes: any[]; errors: string[] }>("/oppocloud/import", {
+    request<{ success: boolean; count: number; notebookId: string; notes: unknown[]; errors: string[] }>("/oppocloud/import", {
       method: "POST",
       body: JSON.stringify({ notes, notebookId }),
     }),
 
   // iCloud (iPhone 备忘录)
   icloudImport: (notes: { id: string; title: string; content: string; folder?: string; date?: string; createDate?: string; modifyDate?: string }[], notebookId?: string) =>
-    request<{ success: boolean; count: number; notebookId: string; notes: any[]; errors: string[] }>("/icloud/import", {
+    request<{ success: boolean; count: number; notebookId: string; notes: unknown[]; errors: string[] }>("/icloud/import", {
       method: "POST",
       body: JSON.stringify({ notes, notebookId }),
     }),
@@ -335,7 +335,10 @@ export const api = {
       throw new Error(err.error || `AI 请求失败: ${res.status}`);
     }
     // SSE stream
-    const reader = res.body!.getReader();
+    if (!res.body) {
+      throw new Error("No response body received");
+    }
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let result = "";
     let buffer = "";
@@ -376,7 +379,10 @@ export const api = {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `AI 请求失败: ${res.status}`);
     }
-    const reader = res.body!.getReader();
+    if (!res.body) {
+      throw new Error("No response body received");
+    }
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let result = "";
     let buffer = "";
@@ -389,7 +395,6 @@ export const api = {
       for (const line of lines) {
         const trimmed = line.trim();
         if (trimmed.startsWith("event:")) {
-          const event = trimmed.slice(6).trim();
           // Read next data line
           continue;
         }
@@ -501,11 +506,11 @@ export const api = {
   },
 
   // Pipelines (批处理管道)
-  getPipelines: () => request<any[]>("/pipelines"),
-  createPipeline: (data: { name: string; description?: string; icon?: string; steps: any[] }) =>
-    request<any>("/pipelines", { method: "POST", body: JSON.stringify(data) }),
-  updatePipeline: (id: string, data: { name?: string; description?: string; icon?: string; steps?: any[] }) =>
-    request<any>(`/pipelines/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  getPipelines: () => request<unknown[]>("/pipelines"),
+  createPipeline: (data: { name: string; description?: string; icon?: string; steps: unknown[] }) =>
+    request<unknown>("/pipelines", { method: "POST", body: JSON.stringify(data) }),
+  updatePipeline: (id: string, data: { name?: string; description?: string; icon?: string; steps?: unknown[] }) =>
+    request<unknown>(`/pipelines/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deletePipeline: (id: string) => request(`/pipelines/${id}`, { method: "DELETE" }),
   runPipeline: (id: string, noteIds: string[]) =>
     request<{
@@ -517,7 +522,7 @@ export const api = {
       failed: number;
       results: { noteId: string; title: string; success: boolean; steps: { type: string; success: boolean; error?: string }[] }[];
     }>(`/pipelines/${id}/run`, { method: "POST", body: JSON.stringify({ noteIds }) }),
-  getPipelineRuns: () => request<any[]>("/pipelines/runs"),
+  getPipelineRuns: () => request<unknown[]>("/pipelines/runs"),
   getPipelineStepTypes: () => request<{ type: string; name: string; icon: string; description: string }[]>("/pipelines/step-types"),
 
 };
@@ -534,8 +539,11 @@ export async function testServerConnection(serverUrl: string): Promise<{ ok: boo
     const data = await res.json();
     if (data.status === "ok") return { ok: true };
     return { ok: false, error: "Invalid response" };
-  } catch (e: any) {
-    if (e.name === "AbortError") return { ok: false, error: "连接超时" };
-    return { ok: false, error: e.message || "连接失败" };
+  } catch (e: unknown) {
+    if (e instanceof Error) {
+      if (e.name === "AbortError") return { ok: false, error: "连接超时" };
+      return { ok: false, error: e.message || "连接失败" };
+    }
+    return { ok: false, error: "连接失败" };
   }
 }

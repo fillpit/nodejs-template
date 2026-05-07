@@ -202,9 +202,10 @@ const ScenarioConfig = ({
   children?: React.ReactNode;
   actionArea: React.ReactNode;
 }) => {
+  const settingsRecord = settings as unknown as Record<string, string | boolean>;
   const isEditing = !!editingScenarios[prefix];
-  const isCustom = !!(settings as any)[`ai_${prefix}_provider`];
-  const scenarioProvider = (settings as any)[`ai_${prefix}_provider`] || settings.ai_provider;
+  const isCustom = !!settingsRecord[`ai_${prefix}_provider`];
+  const scenarioProvider = (settingsRecord[`ai_${prefix}_provider`] as string) || settings.ai_provider;
   const scenarioPreset = getPreset(scenarioProvider);
 
   return (
@@ -279,7 +280,7 @@ const ScenarioConfig = ({
             <div className="space-y-4 pt-1">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {PROVIDER_PRESETS.map(p => {
-                  const isSel = (settings as any)[`ai_${prefix}_provider`] === p.id;
+                  const isSel = settingsRecord[`ai_${prefix}_provider`] === p.id;
                   return (
                     <button
                       key={p.id}
@@ -312,7 +313,7 @@ const ScenarioConfig = ({
                     id={`ai-${prefix}-api-url`}
                     name={`ai_${prefix}_api_url`}
                     type="text"
-                    value={(settings as any)[`ai_${prefix}_api_url`]}
+                    value={settingsRecord[`ai_${prefix}_api_url`] as string || ""}
                     onChange={(e) => setSettings(prev => ({ ...prev, [`ai_${prefix}_api_url`]: e.target.value }))}
                     className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
                   />
@@ -323,7 +324,7 @@ const ScenarioConfig = ({
                     id={`ai-${prefix}-api-key`}
                     name={`ai_${prefix}_api_key`}
                     type="password"
-                    value={(settings as any)[`ai_${prefix}_api_key`]}
+                    value={settingsRecord[`ai_${prefix}_api_key`] as string || ""}
                     onChange={(e) => setSettings(prev => ({ ...prev, [`ai_${prefix}_api_key`]: e.target.value }))}
                     placeholder="留空则不更新"
                     className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
@@ -337,7 +338,7 @@ const ScenarioConfig = ({
                   id={`ai-${prefix}-model`}
                   name={`ai_${prefix}_model`}
                   type="text"
-                  value={(settings as any)[`ai_${prefix}_model`]}
+                  value={settingsRecord[`ai_${prefix}_model`] as string || ""}
                   onChange={(e) => setSettings(prev => ({ ...prev, [`ai_${prefix}_model`]: e.target.value }))}
                   className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-accent-primary/20 outline-none transition-all"
                 />
@@ -353,7 +354,7 @@ const ScenarioConfig = ({
           <div className="space-y-1">
             <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">模型</div>
             <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-              {(settings as any)[`ai_${prefix}_model`] || settings.ai_model || "未设置"}
+              {settingsRecord[`ai_${prefix}_model`] as string || settings.ai_model || "未设置"}
             </div>
           </div>
         </div>
@@ -414,7 +415,7 @@ export default function AISettingsPanel() {
     setSaveMsgs(prev => ({ ...prev, [scenario]: "" }));
     setTestResults(prev => ({ ...prev, [scenario]: null }));
     try {
-      const payload: any = {};
+      const payload: Record<string, unknown> = {};
       if (scenario === "global") {
         payload.ai_provider = settings.ai_provider;
         payload.ai_api_url = settings.ai_api_url;
@@ -428,7 +429,7 @@ export default function AISettingsPanel() {
       }
 
       for (const k in payload) {
-        if (k.includes("api_key") && payload[k]?.includes("****")) {
+        if (k.includes("api_key") && (payload[k] as string)?.includes("****")) {
           delete payload[k];
         }
       }
@@ -438,23 +439,24 @@ export default function AISettingsPanel() {
       if (scenario === "global") setIsConfigured(true);
       setSaveMsgs(prev => ({ ...prev, [scenario]: t("ai.saveSuccess") }));
       setTimeout(() => setSaveMsgs(prev => ({ ...prev, [scenario]: "" })), 2000);
-    } catch (err: any) {
-      setSaveMsgs(prev => ({ ...prev, [scenario]: err.message || t("ai.saveFailed") }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setSaveMsgs(prev => ({ ...prev, [scenario]: message || t("ai.saveFailed") }));
     } finally {
       setIsSaving(prev => ({ ...prev, [scenario]: false }));
     }
   };
 
   const handleTest = async (scenario: string) => {
-    const sId = scenario === "global" ? "" : scenario;
     setIsTesting(prev => ({ ...prev, [scenario]: true }));
     setTestResults(prev => ({ ...prev, [scenario]: null }));
     try {
       await handleSave(scenario);
-      const result = await api.testAIConnection({ scenario: sId });
+      const result = await api.testAIConnection();
       setTestResults(prev => ({ ...prev, [scenario]: { success: result.success, message: result.message || result.error || "" } }));
-    } catch (err: any) {
-      setTestResults(prev => ({ ...prev, [scenario]: { success: false, message: err.message || t("ai.testFailed") } }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setTestResults(prev => ({ ...prev, [scenario]: { success: false, message: message || t("ai.testFailed") } }));
     } finally {
       setIsTesting(prev => ({ ...prev, [scenario]: false }));
     }
@@ -463,7 +465,7 @@ export default function AISettingsPanel() {
   const fetchModels = async () => {
     setLoadingModels(true);
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         ai_provider: settings.ai_provider,
         ai_api_url: settings.ai_api_url,
         ai_model: settings.ai_model,

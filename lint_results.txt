@@ -1,0 +1,4 @@
+
+> node-template@1.0.0 lint /Users/fei/Workspace/admin/nodejs-template
+> eslint . --cache --cache-location .cache/eslint/
+

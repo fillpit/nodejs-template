@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Link2, Copy, Check, Trash2, Shield, Clock, Eye, EyeOff, Globe, RefreshCw, Loader2, ExternalLink, QrCode } from "lucide-react";
+import { motion } from "framer-motion";
+import { X, Link2, Copy, Check, Trash2, Shield, Clock, Eye, EyeOff, Globe, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, getServerUrl } from "@/lib/api";
 import { Share, SharePermission } from "@/types";
@@ -97,7 +97,7 @@ export default function ShareModal({ noteId, noteTitle, onClose }: ShareModalPro
 
       // 刷新列表
       await loadShares();
-    } catch (e: any) {
+    } catch (e) {
       console.error("创建分享失败:", e);
     } finally {
       setCreating(false);

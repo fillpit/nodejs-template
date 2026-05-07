@@ -54,7 +54,7 @@ fonts.post("/upload", async (c) => {
     "INSERT INTO custom_fonts (id, name, fileName, format, fileSize, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))"
   );
 
-  const results: any[] = [];
+  const results: { id: string; name: string; fileName: string; format: string }[] = [];
   const errors: string[] = [];
 
   for (const file of fileList) {
@@ -75,7 +75,7 @@ fonts.post("/upload", async (c) => {
     }
 
     // 检查文件名是否已存在
-    const existing = db.prepare("SELECT id FROM custom_fonts WHERE fileName = ?").get(file.name) as any;
+    const existing = db.prepare("SELECT id FROM custom_fonts WHERE fileName = ?").get(file.name) as { id: string } | undefined;
     if (existing) {
       errors.push(`${file.name}: 字体已存在`);
       continue;
@@ -94,8 +94,9 @@ fonts.post("/upload", async (c) => {
       insert.run(id, name, file.name, format, file.size);
 
       results.push({ id, name, fileName: file.name, format });
-    } catch (err: any) {
-      errors.push(`${file.name}: 上传失败 (${err.message})`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${file.name}: 上传失败 (${message})`);
     }
   }
 
@@ -106,7 +107,7 @@ fonts.post("/upload", async (c) => {
 fonts.get("/file/:id", (c) => {
   const id = c.req.param("id");
   const db = getDb();
-  const row = db.prepare("SELECT id, fileName, format FROM custom_fonts WHERE id = ?").get(id) as any;
+  const row = db.prepare("SELECT id, fileName, format FROM custom_fonts WHERE id = ?").get(id) as { id: string; fileName: string; format: string } | undefined;
 
   if (!row) {
     return c.json({ error: "字体不存在" }, 404);
@@ -139,7 +140,7 @@ fonts.get("/file/:id", (c) => {
 fonts.delete("/:id", (c) => {
   const id = c.req.param("id");
   const db = getDb();
-  const row = db.prepare("SELECT id, format FROM custom_fonts WHERE id = ?").get(id) as any;
+  const row = db.prepare("SELECT id, format FROM custom_fonts WHERE id = ?").get(id) as { id: string; format: string } | undefined;
 
   if (!row) {
     return c.json({ error: "字体不存在" }, 404);

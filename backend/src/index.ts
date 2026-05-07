@@ -13,7 +13,6 @@ import authRouter, { JWT_SECRET } from "./routes/auth";
 import { seedDatabase } from "./db/seed";
 import { getDb } from "./db/schema";
 import { generateOpenAPISpec } from "./services/openapi";
-import { getBackupManager } from "./services/backup";
 
 const app = new Hono();
 
@@ -67,7 +66,7 @@ app.get("/api/fonts", (c) => {
 app.get("/api/fonts/file/:id", (c) => {
   const id = c.req.param("id");
   const db = getDb();
-  const row = db.prepare("SELECT id, fileName, format FROM custom_fonts WHERE id = ?").get(id) as any;
+  const row = db.prepare("SELECT id, fileName, format FROM custom_fonts WHERE id = ?").get(id) as { id: string; fileName: string; format: string } | undefined;
   if (!row) return c.json({ error: "字体不存在" }, 404);
 
   const fontsDir = path.join(process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data"), "fonts");
@@ -136,7 +135,7 @@ app.put("/api/me", async (c) => {
   const { avatarUrl, email } = body as { avatarUrl?: string; email?: string };
 
   const updates: string[] = [];
-  const params: any[] = [];
+  const params: unknown[] = [];
 
   if (avatarUrl !== undefined) {
     updates.push("avatarUrl = ?");
@@ -159,8 +158,9 @@ app.put("/api/me", async (c) => {
     db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...params);
     const updatedUser = db.prepare("SELECT id, username, email, avatarUrl, createdAt FROM users WHERE id = ?").get(userId);
     return c.json(updatedUser);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return c.json({ error: errorMessage }, 500);
   }
 });
 
@@ -217,10 +217,6 @@ if (process.env.NODE_ENV === "production") {
     return c.json({ error: "Not Found" }, 404);
   });
 }
-// 启动自动备份（每24小时）
-// try {
-//   getBackupManager().startAutoBackup(24);
-// } catch { /* 备份启动失败不阻塞服务 */ }
 
 console.log(`🚀 nowen-note API running on http://localhost:${port}`);
 console.log(`📖 OpenAPI 文档: http://localhost:${port}/api/openapi.json`);
