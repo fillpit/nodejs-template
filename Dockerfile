@@ -1,5 +1,5 @@
 # Stage 1: Build frontend
-FROM node:20-slim AS frontend-build
+FROM node:24-slim AS frontend-build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -10,7 +10,7 @@ COPY frontend/ .
 RUN pnpm run build
 
 # Stage 2: Build backend
-FROM node:20-slim AS backend-build
+FROM node:24-slim AS backend-build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -25,7 +25,7 @@ RUN pnpm run build
 RUN pnpm prune --prod
 
 # Stage 3: Production
-FROM node:20-slim
+FROM node:24-slim
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
