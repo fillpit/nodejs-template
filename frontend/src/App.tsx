@@ -6,7 +6,6 @@ import { Capacitor } from "@capacitor/core";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
 import AdminPanel from "@/components/AdminPanel";
-import AIChatPanel from "@/components/AIChatPanel";
 import LoginPage from "@/components/LoginPage";
 import { AppProvider, useApp, useAppActions, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH } from "@/store/AppContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -125,7 +124,6 @@ function AppLayout({ user }: { user: User }) {
     }
   }, [user, actions]);
 
-  const isAIChatView = state.viewMode === "ai-chat";
 
   const handleBackToList = useCallback(() => {
     actions.setMobileView("list");
@@ -187,24 +185,14 @@ function AppLayout({ user }: { user: User }) {
       </div>
       <SidebarResizeHandle />
 
-      {isAIChatView ? (
-        <div className="flex-1 flex flex-col">
-          <MobileTopBar />
-          <AIChatPanel
-            onClose={() => actions.setViewMode("dashboard")}
-            onNavigateToNote={async () => { /* no-op */ }}
-          />
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col">
-          <MobileTopBar />
-          {state.viewMode === "admin" ? (
-            <AdminPanel />
-          ) : (
-            <Dashboard />
-          )}
-        </div>
-      )}
+      <div className="flex-1 flex flex-col">
+        <MobileTopBar />
+        {state.viewMode === "admin" ? (
+          <AdminPanel />
+        ) : (
+          <Dashboard />
+        )}
+      </div>
     </div>
   );
 }

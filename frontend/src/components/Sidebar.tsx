@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  PanelLeftClose, PanelLeft, Settings, LogOut, X, Bot, LayoutDashboard, User, Shield,
+  PanelLeftClose, PanelLeft, Settings, LogOut, X, LayoutDashboard, User, Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SettingsModal from "@/components/SettingsModal";
@@ -22,7 +22,6 @@ export default function Sidebar() {
 
   const rawNavItems: { icon: React.ReactNode; label: string; mode: ViewMode; active: boolean; badge?: string }[] = [
     { icon: <LayoutDashboard size={16} />, label: t('sidebar.dashboard', "仪表盘"), mode: "dashboard", active: state.viewMode === "dashboard" },
-    { icon: <Bot size={16} />, label: "AI 秘书", mode: "ai-chat", active: state.viewMode === "ai-chat" },
   ];
   const navItems = rawNavItems;
 
