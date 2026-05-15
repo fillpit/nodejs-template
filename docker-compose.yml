@@ -16,6 +16,12 @@ services:
       - PORT=3001
       # Ollama 地址，如需使用请自行部署 Ollama 并填写正确地址
       # - OLLAMA_URL=http://host.docker.internal:11434
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3001/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   node-template-data:
